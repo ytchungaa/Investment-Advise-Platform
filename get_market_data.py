@@ -116,6 +116,6 @@ class schwab_api_market:
 if __name__ == "__main__":
     api = schwab_api_market()
     # df = api.get_instrument_fundamental(symbol=['AAPL', 'TSLA', 'MSFT'])
-    # df = api.get_price_history(symbol='AAPL', period_type='month', period='1', frequency_type='daily', frequency='1', start_date='2025-01-01', end_date='2025-01-31', need_extended_hours_data=True, need_previous_close=True)
+    df = api.get_price_history(symbol='$SPX', period_type='month', period='1', frequency_type='daily', frequency='1', start_date='2025-01-01', end_date='2025-01-31', need_extended_hours_data=True, need_previous_close=True)
 
     print(df)
