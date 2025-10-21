@@ -1,6 +1,5 @@
 CREATE TABLE dwd.stock_list(
-    company TEXT,
-    symbol TEXT PRIMARY KEY
+    symbol TEXT PRIMARY KEY,
+    symbol_name TEXT,
+    type TEXT
 );
-
--- composition of different index can be found in: https://www.slickcharts.com/sp500

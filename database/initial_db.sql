@@ -1,0 +1,3 @@
+CREATE DATABASE investment_advise_platform;
+CREATE SCHEMA IF NOT EXISTS ods;
+CREATE SCHEMA IF NOT EXISTS dwd;

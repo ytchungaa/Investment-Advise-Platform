@@ -9,7 +9,7 @@ dotenv.load_dotenv()
 dotenv_path = dotenv.find_dotenv()
 
 class connector:
-    def __init__(self, schema, user=os.getenv("POSTGRES_DB_USERNAME"), password=os.getenv("POSTGRES_DB_PASSWORD"), address='localhost', port=5432, db_name='investment_advisor'):
+    def __init__(self, schema, user=os.getenv("POSTGRES_DB_USERNAME"), password=os.getenv("POSTGRES_DB_PASSWORD"), address='localhost', port=5432, db_name='investment_advise_platform'):
         if not user:
             user = input("Enter your PostgreSQL username: ").strip()
             dotenv.set_key(dotenv_path, "POSTGRES_DB_USERNAME", user)
