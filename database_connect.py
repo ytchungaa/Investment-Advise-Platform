@@ -106,9 +106,7 @@ class connector:
     def update_from_dataframe(
         self,
         df: pd.DataFrame,
-        table_name: str,
-        key_columns: list[str],
-        update_columns: list[str] | None = None,
+        table_name: str
     ) -> None:
         """
         Bulk UPDATE `table_name` using rows from `df`.
@@ -116,49 +114,18 @@ class connector:
         - `update_columns`: columns to update (defaults to df columns minus keys).
         """
         try:
-            # Validate columns against actual table
-            table_cols = set(self.query_columns(table_name))
-            if not table_cols:
-                raise ValueError(f"Could not fetch columns for '{table_name}'.")
-            if not set(key_columns).issubset(table_cols):
-                missing = set(key_columns) - table_cols
-                raise ValueError(f"Key columns not in table: {missing}")
-
-            # Decide which columns to update
-            if update_columns is None:
-                update_columns = [c for c in df.columns if c not in key_columns]
-            update_columns = [c for c in update_columns if c in table_cols and c not in key_columns]
-            if not update_columns:
-                logger.info("No updatable columns found; nothing to do.")
+            cols_in_db = self.query_columns(table_name)
+            df_filtered = df[[col for col in df.columns if col in cols_in_db]]
+            if df_filtered.empty:
+                logger.warning(f"No matching columns found in DataFrame for table '{table_name}'. Update skipped.")
                 return
-
-            # Keep only needed columns
-            cols_needed = [c for c in (key_columns + update_columns) if c in df.columns]
-            work = df.loc[:, cols_needed].drop_duplicates(subset=key_columns)
-            if work.empty:
-                logger.info("Input DataFrame is empty after filtering; nothing to do.")
-                return
-
-            # Create TEMP table and insert DataFrame
-            temp_name = f"tmp_update_{table_name}"
-            with self.connection.begin():
-                self.connection.execute(text(f"DROP TABLE IF EXISTS {temp_name};"))
-                work.to_sql(temp_name, self.engine, if_exists="replace", index=False)
-
-                # Build UPDATE statement
-                set_sql = ", ".join([f"t.{c} = s.{c}" for c in update_columns])
-                join_sql = " AND ".join([f"t.{k} = s.{k}" for k in key_columns])
-
-                self.connection.execute(text(f"""
-                    UPDATE {table_name} AS t
-                    SET {set_sql}
-                    FROM {temp_name} AS s
-                    WHERE {join_sql};
-                """))
-
-                self.connection.execute(text(f"DROP TABLE IF EXISTS {temp_name};"))
-
-            logger.info(f"Bulk update completed for '{table_name}'.")
+            
+            temp_table_name = f'temp_update_{table_name}'
+            with self.engine.begin() as conn:
+                conn.execute(text(f"CREATE TEMP TABLE {temp_table_name} AS SELECT * FROM {table_name} WITH NO DATA;"))
+                df_filtered.to_sql(temp_table_name, conn, if_exists='append', index=False)
+                conn.execute(text(f"TRUNCATE TABLE {table_name};"))
+                conn.execute(text(f"INSERT INTO {table_name} SELECT * FROM {temp_table_name};"))
         except Exception as e:
             logger.error(f"Bulk update error for '{table_name}': {e}")
 

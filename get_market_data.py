@@ -33,11 +33,11 @@ class schwab_api_market:
             df['fetch_at'] = pd.Timestamp.now()
         return df
     
-    def get_instrument_fundamental(self, symbol: str|list, chunksize: int=500):
+    def get_instrument_fundamental(self, symbols: str|list, chunksize: int=500):
         if chunksize > 500:
             logger.warning("Schwab API limits the number of symbols per request. Using a chunksize of 500.")
             chunksize = 500
-        symbols = symbol if isinstance(symbol, list) else [symbol]
+        symbols = symbols if isinstance(symbols, list) else [symbols]
         df = pd.DataFrame()  # Make sure 'pd' is pandas and not a local variable
         for i in range(0, len(symbols), chunksize):
             chunk = ','.join(symbols[i:i + chunksize])
@@ -115,7 +115,8 @@ class schwab_api_market:
 
 if __name__ == "__main__":
     api = schwab_api_market()
-    # df = api.get_instrument_fundamental(symbol=['AAPL', 'TSLA', 'MSFT'])
-    df = api.get_price_history(symbol='$SPX', period_type='month', period='1', frequency_type='daily', frequency='1', start_date='2025-01-01', end_date='2025-01-31', need_extended_hours_data=True, need_previous_close=True)
+    # df = api.get_instrument_fundamental(symbol=['VOO'])
+    df = api.get_instruments(symbols=['VOO'])
+    # df = api.get_price_history(symbol='$SPX', period_type='month', period='1', frequency_type='daily', frequency='1', start_date='2025-01-01', end_date='2025-01-31', need_extended_hours_data=True, need_previous_close=True)
 
     print(df)
