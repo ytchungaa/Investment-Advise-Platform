@@ -17,7 +17,7 @@ CREATE TYPE order_special_instruction_enum AS ENUM ('ALL_OR_NONE','DO_NOT_REDUCE
 CREATE TABLE orders (
   order_id           BIGINT PRIMARY KEY,                        -- e.g. 1003060390456, unique per Schwab sample  
   account_id         BIGINT NOT NULL REFERENCES securities_account(id) ON DELETE CASCADE,
-  snapshot_id        BIGINT NOT NULL REFERENCES snapshot(id) ON DELETE CASCADE,  -- when you pulled it (fits your snapshot model) :contentReference[oaicite:14]{index=14}
+  created_at         TIMESTAMPTZ NOT NULL DEFAULT now(),  -- when you pulled it (fits your snapshot model) :contentReference[oaicite:14]{index=14}
   session            order_session_enum,
   duration           order_duration_enum,
   order_type         order_type_enum,
@@ -30,7 +30,7 @@ CREATE TABLE orders (
   price              DOUBLE PRECISION,
   tax_lot_method     TEXT,         -- keep TEXT; enum available if needed later  :contentReference[oaicite:15]{index=15}
   order_strategy     order_strategy_enum,
-  cancelable         BOOLEAN,
+  cancelable         BOOLEAN, 
   editable           BOOLEAN,
   status             order_status_enum,
   entered_time       TIMESTAMPTZ,
