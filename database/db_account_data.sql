@@ -38,7 +38,7 @@ CREATE TABLE ods.instrument (
 
 -- ===== Positions (one table; per account x instrument x snapshot)
 CREATE TABLE ods.position (
-  snapshot_id BIGINT NOT NULL REFERENCES ods.snapshot(id) ON DELETE CASCADE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   account_id  BIGINT NOT NULL REFERENCES ods.securities_account(id) ON DELETE CASCADE,
   instrument_id BIGINT NOT NULL REFERENCES ods.instrument(id),
   long_quantity DOUBLE PRECISION,
@@ -53,13 +53,13 @@ CREATE TABLE ods.position (
   long_open_profit_loss DOUBLE PRECISION,
   previous_session_long_quantity DOUBLE PRECISION,
   current_day_cost DOUBLE PRECISION,
-  PRIMARY KEY (snapshot_id, account_id, instrument_id)
+  PRIMARY KEY (created_at, account_id, instrument_id)
 );
 
 -- ===== Balances
 -- Initial (has extra fields in sample)
 CREATE TABLE ods.account_initial_balances (
-  snapshot_id BIGINT NOT NULL REFERENCES ods.snapshot(id) ON DELETE CASCADE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   account_id  BIGINT NOT NULL REFERENCES ods.securities_account(id) ON DELETE CASCADE,
   accrued_interest NUMERIC,
   cash_available_for_trading NUMERIC,
@@ -79,12 +79,12 @@ CREATE TABLE ods.account_initial_balances (
   cash_debit_call_value NUMERIC,
   pending_deposits NUMERIC,
   account_value NUMERIC,
-  PRIMARY KEY (snapshot_id, account_id)
+  PRIMARY KEY (created_at, account_id)
 );
 
 -- Current (matches your sample keys)
 CREATE TABLE ods.account_current_balances (
-  snapshot_id BIGINT NOT NULL REFERENCES ods.snapshot(id) ON DELETE CASCADE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   account_id  BIGINT NOT NULL REFERENCES ods.securities_account(id) ON DELETE CASCADE,
   accrued_interest NUMERIC,
   cash_balance NUMERIC,
@@ -106,21 +106,21 @@ CREATE TABLE ods.account_current_balances (
   total_cash NUMERIC,
   cash_debit_call_value NUMERIC,
   unsettled_cash NUMERIC,
-  PRIMARY KEY (snapshot_id, account_id)
+  PRIMARY KEY (created_at, account_id)
 );
 
 -- Projected (sample only shows the two fields)
 CREATE TABLE ods.account_projected_balances (
-  snapshot_id BIGINT NOT NULL REFERENCES ods.snapshot(id) ON DELETE CASCADE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   account_id  BIGINT NOT NULL REFERENCES ods.securities_account(id) ON DELETE CASCADE,
   cash_available_for_trading NUMERIC,
   cash_available_for_withdrawal NUMERIC,
-  PRIMARY KEY (snapshot_id, account_id)
+  PRIMARY KEY (created_at, account_id)
 );
 
 -- Aggregated balance block in sample
 CREATE TABLE ods.aggregated_balance (
-  snapshot_id BIGINT PRIMARY KEY REFERENCES ods.snapshot(id) ON DELETE CASCADE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   current_liquidation_value NUMERIC,
   liquidation_value NUMERIC
 );
