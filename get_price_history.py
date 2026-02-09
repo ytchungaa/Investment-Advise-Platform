@@ -14,53 +14,6 @@ class schwab_api_market:
         self.access_token = SchwabAuth().get_token()
         self.server_link = 'https://api.schwabapi.com/marketdata/v1'
 
-    def get_instruments(self, symbols: str|list, chunksize: int=500) -> pd.DataFrame:
-        if chunksize > 500:
-            logger.warning("Schwab API limits the number of symbols per request. Using a chunksize of 500.")
-            chunksize = 500
-        symbols = symbols if isinstance(symbols, list) else [symbols]
-        df = pd.DataFrame()  # Make sure 'pd' is pandas and not a local variable
-        for i in range(0, len(symbols), chunksize):
-            chunk = ','.join(symbols[i:i + chunksize])
-            response = requests.get(f'{self.server_link}/instruments', 
-                                    headers={'Authorization': f'Bearer {self.access_token}'},
-                                    params={'symbol': chunk, 'projection': 'symbol-search'})
-            if response.status_code != 200:
-                logger.error(f"Error fetching instruments: {response.status_code} - {response.text}")
-                return pd.DataFrame()  # Make sure 'pd' is pandas and not a local variable
-            df_chunk = pd.json_normalize(response.json()['instruments'])
-            df = pd.concat([df, df_chunk], ignore_index=True)
-            df['fetch_at'] = pd.Timestamp.now()
-        return df
-    
-    def get_instrument_fundamental(self, symbols: str|list, chunksize: int=500):
-        if chunksize > 500:
-            logger.warning("Schwab API limits the number of symbols per request. Using a chunksize of 500.")
-            chunksize = 500
-        symbols = symbols if isinstance(symbols, list) else [symbols]
-        df = pd.DataFrame()  # Make sure 'pd' is pandas and not a local variable
-        for i in range(0, len(symbols), chunksize):
-            chunk = ','.join(symbols[i:i + chunksize])
-            response = requests.get(f'{self.server_link}/instruments', 
-                                    headers={'Authorization': f'Bearer {self.access_token}'},
-                                    params={'symbol': chunk, 'projection': 'fundamental'})
-            if response.status_code != 200:
-                logger.error(f"Error fetching instrument fundamentals: {response.status_code} - {response.text}")
-                return pd.DataFrame()  # Make sure 'pd' is pandas and not a local variable
-            data = response.json()
-            instruments = data.get('instruments', [])
-            if not instruments:
-                logger.warning(f"No instruments found in response for symbols: {chunk}")
-                continue
-            fundamentals = [inst.get('fundamental', {}) for inst in instruments if 'fundamental' in inst]
-            if not fundamentals:
-                logger.warning(f"No fundamental data found for symbols: {chunk}")
-                continue
-            df_chunk = pd.json_normalize(fundamentals)
-            df = pd.concat([df, df_chunk], ignore_index=True)
-            df['fetch_at'] = pd.Timestamp.now()
-        return df
-
     def get_price_history(
             self, 
             symbol: str, 
