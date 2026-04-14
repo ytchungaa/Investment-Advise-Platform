@@ -1,32 +1,32 @@
 #!/bin/bash
-set -e  # exit on error
+set -e
 
-echo "🔍 Checking Python installation..."
+echo "Checking Python installation..."
 
-# Use python3 explicitly
 if ! command -v python3 &> /dev/null; then
-    echo "❌ Python3 not found. Please install it first (e.g., via Homebrew: brew install python)."
+    echo "Python3 not found. Install it first."
     exit 1
 fi
 
-# Create virtual environment
-echo "⚙️ Creating Python virtual environment..."
-python3 -m venv venv
+echo "Creating virtual environment..."
 
-# Activate virtual environment
-echo "📦 Activating virtual environment..."
-source venv/bin/activate
-
-# Check requirements.txt
-if [[ -f "requirements.txt" ]]; then
-    echo "📥 Installing dependencies..."
-    pip install --upgrade pip
-    pip install -r requirements.txt
+if [[ ! -d "venv" ]]; then
+    python3 -m venv venv
 else
-    echo "⚠️ No requirements.txt found, skipping dependency installation."
+    echo "Virtual environment already exists, skipping."
+fi
+
+echo "Installing dependencies..."
+
+venv/bin/python -m pip install --upgrade pip
+
+if [[ -f "requirements.txt" ]]; then
+    venv/bin/python -m pip install -r requirements.txt
+else
+    echo "No requirements.txt found, skipping."
 fi
 
 echo ""
-echo "✅ Setup complete! Virtual environment is ready."
-echo "To activate later, run:"
+echo "Setup complete."
+echo "Activate with:"
 echo "source venv/bin/activate"

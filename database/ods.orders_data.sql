@@ -14,9 +14,9 @@ CREATE TYPE order_div_cap_gains_enum AS ENUM ('REINVEST','PAYOUT'); -- :contentR
 CREATE TYPE order_special_instruction_enum AS ENUM ('ALL_OR_NONE','DO_NOT_REDUCE','ALL_OR_NONE_DO_NOT_REDUCE'); -- :contentReference[oaicite:12]{index=12}
 
 -- ====== ORDERS (one row per Schwab order)
-CREATE TABLE orders (
+CREATE TABLE IF NOT EXISTS ods.orders (
   order_id           BIGINT PRIMARY KEY,                        -- e.g. 1003060390456, unique per Schwab sample  
-  account_id         BIGINT NOT NULL REFERENCES securities_account(id) ON DELETE CASCADE,
+  account_id         BIGINT NOT NULL REFERENCES ods.securities_account(id) ON DELETE CASCADE,
   created_at         TIMESTAMPTZ NOT NULL DEFAULT now(),  -- when you pulled it (fits your snapshot model) :contentReference[oaicite:14]{index=14}
   session            order_session_enum,
   duration           order_duration_enum,
@@ -36,16 +36,15 @@ CREATE TABLE orders (
   entered_time       TIMESTAMPTZ,
   close_time         TIMESTAMPTZ,
   tag                TEXT,         -- e.g. API_TOS:FUNDAMENTALS / POS_STMT  
-  account_number     TEXT NOT NULL, -- denormalized for quick joins / validation  
-  PRIMARY KEY (order_id, account_id)
+  account_number     TEXT NOT NULL -- denormalized for quick joins / validation  
 );
 
 -- ====== ORDER LEGS (EQUITY / FIXED_INCOME etc., per legId)
-CREATE TABLE order_leg (
-  order_id        BIGINT NOT NULL REFERENCES orders(order_id) ON DELETE CASCADE,
+CREATE TABLE IF NOT EXISTS ods.order_leg (
+  order_id        BIGINT NOT NULL REFERENCES ods.orders(order_id) ON DELETE CASCADE,
   leg_id          BIGINT NOT NULL,
   order_leg_type  order_leg_type_enum,
-  instrument_id   BIGINT REFERENCES instrument(id),  -- resolve via (symbol, asset_type) or instrumentId during ETL 
+  instrument_id   BIGINT REFERENCES ods.instrument(id),  -- resolve via (symbol, asset_type) or instrumentId during ETL 
   instruction     order_instruction_enum,
   position_effect order_position_effect_enum,
   quantity        DOUBLE PRECISION,
@@ -59,8 +58,8 @@ CREATE TABLE order_leg (
 CREATE TYPE order_activity_type_enum AS ENUM ('EXECUTION','ORDER_ACTION');  -- :contentReference[oaicite:19]{index=19}
 CREATE TYPE order_execution_type_enum AS ENUM ('FILL');                      -- :contentReference[oaicite:20]{index=20}
 
-CREATE TABLE order_activity (
-  order_id                 BIGINT NOT NULL REFERENCES orders(order_id) ON DELETE CASCADE,
+CREATE TABLE IF NOT EXISTS ods.order_activity (
+  order_id                 BIGINT NOT NULL REFERENCES ods.orders(order_id) ON DELETE CASCADE,
   activity_id              BIGINT PRIMARY KEY,  -- from sample: activityId  
   activity_type            order_activity_type_enum,
   execution_type           order_execution_type_enum,
@@ -69,8 +68,8 @@ CREATE TABLE order_activity (
 );
 
 -- ====== EXECUTION LEGS (per activity x leg)
-CREATE TABLE execution_leg (
-  activity_id        BIGINT NOT NULL REFERENCES order_activity(activity_id) ON DELETE CASCADE,
+CREATE TABLE IF NOT EXISTS ods.execution_leg (
+  activity_id        BIGINT NOT NULL REFERENCES ods.order_activity(activity_id) ON DELETE CASCADE,
   leg_id             BIGINT NOT NULL,
   price              DOUBLE PRECISION,
   quantity           DOUBLE PRECISION,
@@ -83,4 +82,3 @@ CREATE TABLE execution_leg (
 -- ====== OPTIONAL: link to child/replacing orders if you capture those later
 -- CREATE TYPE order_link_enum AS ENUM ('CHILD','REPLACING');
 -- CREATE TABLE order_link (order_id BIGINT, linked_order_id BIGINT, link_type order_link_enum, PRIMARY KEY(order_id, linked_order_id, link_type));
-

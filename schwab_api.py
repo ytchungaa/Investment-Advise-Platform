@@ -8,8 +8,8 @@ import sqlalchemy as sa
 from typing import List
 
 class SchwabApi:
-    def __init__(self, access_token = SchwabAuth().get_token(), account_number:int = 0):
-        self.access_token = access_token
+    def __init__(self, access_token=None, account_number:int = 0):
+        self.access_token = access_token or SchwabAuth().get_token()
         self.account_number_hash = '' ## Got this from database
         self.server_mapping = {
         'trader' : 'https://api.schwabapi.com/trader/v1',

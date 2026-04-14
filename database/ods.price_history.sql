@@ -1,15 +1,19 @@
-
-CREATE TABLE ods.price_history (
-    symbol TEXT NOT NULL,
-    datetime BIGINT NOT NULL,
-    open FLOAT,
-    high FLOAT,
-    low FLOAT,
-    close FLOAT,
-    volume BIGINT
+CREATE TABLE IF NOT EXISTS ods.price_history (
+    instrument_id BIGINT NOT NULL REFERENCES ods.instrument(id) ON DELETE CASCADE,
+    frequency_type TEXT NOT NULL CHECK (frequency_type IN ('minute', 'daily', 'weekly', 'monthly')),
+    frequency INTEGER NOT NULL,
+    candle_time TIMESTAMPTZ NOT NULL,
+    open DOUBLE PRECISION,
+    high DOUBLE PRECISION,
+    low DOUBLE PRECISION,
+    close DOUBLE PRECISION,
+    volume BIGINT,
+    previous_close DOUBLE PRECISION,
+    previous_close_time TIMESTAMPTZ,
+    need_extended_hours_data BOOLEAN NOT NULL DEFAULT TRUE,
+    source_payload JSONB,
+    PRIMARY KEY (instrument_id, frequency_type, frequency, candle_time)
 );
 
-CREATE INDEX idx_price_history_symbol_datetime
-ON ods.price_history (symbol, datetime);
-
-DROP TABLE IF EXISTS ods.price_history CASCADE;
+CREATE INDEX IF NOT EXISTS idx_price_history_instrument_time
+ON ods.price_history (instrument_id, candle_time DESC);

@@ -1,12 +1,10 @@
-pandas            # Data manipulation, time series analysis
-requests        # API calls (e.g., Schwab API)
-matplotlib       # Data visualization (charts, trends)
-numpy           # Numerical calculations
-sqlalchemy     # If you're storing data in a database
-flask            # Optional: if you're building a web dashboard
-python-dotenv     # For managing API keys / config securely
+pandas
+requests
+matplotlib
+numpy
+sqlalchemy
+flask
+python-dotenv
 cryptography
-dotenv
-psycopg2
 psycopg2-binary
 yfinance
