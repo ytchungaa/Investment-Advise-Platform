@@ -1,4 +1,5 @@
 import datetime
+import time
 from typing import Iterable
 
 import pandas as pd
@@ -7,25 +8,78 @@ import requests
 from logging_config import logger
 from schwab_auth import SchwabAuth
 
+PRICE_HISTORY_FREQUENCY_TYPE_IDS = {
+    "minute": 1,
+    "daily": 2,
+    "weekly": 3,
+    "monthly": 4,
+}
+
+
+def get_price_history_frequency_type_id(frequency_type: str) -> int:
+    try:
+        return PRICE_HISTORY_FREQUENCY_TYPE_IDS[frequency_type]
+    except KeyError as exc:
+        valid_values = ", ".join(sorted(PRICE_HISTORY_FREQUENCY_TYPE_IDS))
+        raise ValueError(
+            f"frequency_type must be one of: {valid_values}"
+        ) from exc
+
 
 class schwab_api_market:
     def __init__(self):
         self.auth = SchwabAuth()
         self.access_token = self.auth.get_token()
         self.server_link = "https://api.schwabapi.com/marketdata/v1"
+        self.session = requests.Session()
 
     def _request(self, path: str, params: dict) -> dict:
-        for attempt in range(2):
-            response = requests.get(
-                f"{self.server_link}{path}",
-                headers={"Authorization": f"Bearer {self.access_token}"},
-                params=params,
-                timeout=30,
-            )
-            if response.status_code == 401 and attempt == 0:
-                logger.warning(f"Received 401 for {path}. Refreshing token and retrying once.")
+        max_attempts = 4
+        for attempt in range(max_attempts):
+            try:
+                response = self.session.get(
+                    f"{self.server_link}{path}",
+                    headers={"Authorization": f"Bearer {self.access_token}"},
+                    params=params,
+                    timeout=30,
+                )
+            except requests.RequestException as exc:
+                if attempt == max_attempts - 1:
+                    logger.error(f"Error fetching {path}: request failed after retries: {exc}")
+                    return {}
+                sleep_seconds = min(2**attempt, 8)
+                logger.warning(
+                    f"Request exception for {path}: {exc}. Retrying in {sleep_seconds} seconds."
+                )
+                time.sleep(sleep_seconds)
+                continue
+
+            if response.status_code == 401 and attempt < max_attempts - 1:
+                logger.warning(f"Received 401 for {path}. Refreshing token and retrying.")
                 self.access_token = self.auth.get_token()
                 continue
+
+            if response.status_code == 429 and attempt < max_attempts - 1:
+                retry_after_header = response.headers.get("Retry-After")
+                try:
+                    retry_after_seconds = float(retry_after_header) if retry_after_header else 0.0
+                except ValueError:
+                    retry_after_seconds = 0.0
+                sleep_seconds = retry_after_seconds or min(2**attempt, 8)
+                logger.warning(
+                    f"Received 429 for {path}. Retrying in {sleep_seconds} seconds."
+                )
+                time.sleep(sleep_seconds)
+                continue
+
+            if 500 <= response.status_code < 600 and attempt < max_attempts - 1:
+                sleep_seconds = min(2**attempt, 8)
+                logger.warning(
+                    f"Received {response.status_code} for {path}. Retrying in {sleep_seconds} seconds."
+                )
+                time.sleep(sleep_seconds)
+                continue
+
             if response.status_code != 200:
                 logger.error(f"Error fetching {path}: {response.status_code} - {response.text}")
                 return {}
@@ -93,7 +147,6 @@ class schwab_api_market:
                         "realtime": None,
                         "first_seen_at": fetched_at,
                         "last_seen_at": fetched_at,
-                        "source_payload": instrument,
                     }
                 )
 
@@ -184,7 +237,6 @@ class schwab_api_market:
                             fundamental.get("nextDividendDate")
                         ),
                         "fund_leverage_factor": fundamental.get("fundLeverageFactor"),
-                        "source_payload": fundamental,
                     }
                 )
 
@@ -216,7 +268,6 @@ class schwab_api_market:
                         "ssid": quote_payload.get("ssid"),
                         "realtime": quote_payload.get("realtime"),
                         "last_seen_at": fetched_at,
-                        "source_payload": quote_payload,
                     }
                 )
 
@@ -252,7 +303,6 @@ class schwab_api_market:
                         "trade_time": trade_time,
                         "security_status": quote.get("securityStatus"),
                         "total_volume": quote.get("totalVolume"),
-                        "source_payload": quote_payload,
                     }
                 )
 
@@ -282,6 +332,7 @@ class schwab_api_market:
             "weekly": ["1"],
             "monthly": ["1"],
         }
+        frequency_type_id = get_price_history_frequency_type_id(frequency_type)
 
         if period_type not in valid_periods or period not in valid_periods[period_type]:
             raise ValueError("period_type must be valid for the requested period")
@@ -296,7 +347,6 @@ class schwab_api_market:
         end_timestamp = int(
             datetime.datetime.strptime(end_date, "%Y-%m-%d").timestamp() * 1000
         )
-        fetched_at = self._now_utc()
         payload = self._request(
             "/pricehistory",
             {
@@ -322,7 +372,7 @@ class schwab_api_market:
             records.append(
                 {
                     "symbol": payload.get("symbol", symbol),
-                    "frequency_type": frequency_type,
+                    "frequency_type": frequency_type_id,
                     "frequency": int(frequency),
                     "candle_time": self._epoch_millis_to_timestamp(candle.get("datetime")),
                     "open": candle.get("open"),
@@ -333,13 +383,6 @@ class schwab_api_market:
                     "previous_close": payload.get("previousClose"),
                     "previous_close_time": previous_close_time,
                     "need_extended_hours_data": need_extended_hours_data,
-                    "source_payload": {
-                        "symbol": payload.get("symbol", symbol),
-                        "candle": candle,
-                        "previousClose": payload.get("previousClose"),
-                        "previousCloseDate": payload.get("previousCloseDate"),
-                        "fetchedAt": fetched_at.isoformat(),
-                    },
                 }
             )
 

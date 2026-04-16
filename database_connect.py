@@ -91,7 +91,7 @@ class connector:
         return {
             column: JSONB
             for column in df.columns
-            if column.endswith("_payload") or column == "source_payload"
+            if column == "request_params"
         }
 
     def insert_dataframe(
@@ -154,14 +154,14 @@ class connector:
         conflict_columns: list[str],
         update_columns: list[str] | None = None,
         chunksize: int | None = None,
-    ) -> None:
+    ) -> bool:
         try:
             filtered_df = self._filter_dataframe(df, table_name)
             if filtered_df.empty:
                 logger.warning(
                     f"No matching columns found in DataFrame for table '{table_name}'. Upsert skipped."
                 )
-                return
+                return False
 
             temp_table_name = f"temp_upsert_{table_name}_{uuid.uuid4().hex[:8]}"
             insert_columns = filtered_df.columns.tolist()
@@ -209,8 +209,10 @@ class connector:
                 conn.execute(text(upsert_sql))
 
             logger.info(f"Successfully upserted DataFrame into table '{table_name}'.")
+            return True
         except Exception as e:
             logger.error(f"Error upserting DataFrame into table '{table_name}': {e}")
+            return False
 
 
 if __name__ == "__main__":

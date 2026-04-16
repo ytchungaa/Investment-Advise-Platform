@@ -36,8 +36,30 @@ def _instrument_update_columns() -> list[str]:
         "ssid",
         "realtime",
         "last_seen_at",
-        "source_payload",
     ]
+
+
+def _ensure_price_history_frequency_types(db_ods: connector) -> None:
+    db_ods.execute(
+        """
+        CREATE TABLE IF NOT EXISTS price_history_frequency_type (
+            id SMALLINT PRIMARY KEY,
+            code TEXT NOT NULL UNIQUE
+        );
+        """
+    )
+    db_ods.execute(
+        """
+        INSERT INTO price_history_frequency_type (id, code)
+        VALUES
+            (1, 'minute'),
+            (2, 'daily'),
+            (3, 'weekly'),
+            (4, 'monthly')
+        ON CONFLICT (id) DO UPDATE
+        SET code = EXCLUDED.code;
+        """
+    )
 
 
 def stock_list_market_data(
@@ -52,6 +74,7 @@ def stock_list_market_data(
 ):
     db_ods = connector(schema="ods")
     db_dwd = connector(schema="dwd")
+    _ensure_price_history_frequency_types(db_ods)
     symbols = _load_watch_list(db_dwd)
     if not symbols:
         logger.warning("Watch list is empty. No symbols to fetch market data for.")
@@ -148,7 +171,7 @@ def stock_list_market_data(
 
     if price_frames:
         price_history_df = pd.concat(price_frames, ignore_index=True)
-        db_ods.upsert_dataframe(
+        success = db_ods.upsert_dataframe(
             price_history_df,
             table_name="price_history",
             conflict_columns=["instrument_id", "frequency_type", "frequency", "candle_time"],
@@ -161,10 +184,11 @@ def stock_list_market_data(
                 "previous_close",
                 "previous_close_time",
                 "need_extended_hours_data",
-                "source_payload",
             ],
             chunksize=500,
         )
+        if not success:
+            raise RuntimeError("Failed to upsert price history during daily update.")
     else:
         price_history_df = pd.DataFrame()
 

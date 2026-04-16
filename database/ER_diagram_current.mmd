@@ -1,0 +1,199 @@
+erDiagram
+    ods_load_audit {
+        BIGSERIAL id PK
+        TEXT dataset_name
+        TIMESTAMPTZ requested_at
+        TIMESTAMPTZ completed_at
+        JSONB request_params
+        TEXT status
+        TEXT notes
+    }
+
+    ods_instrument {
+        BIGSERIAL id PK
+        TEXT symbol UK
+        TEXT asset_type UK
+        TEXT cusip
+        TEXT description
+        TEXT exchange
+        TEXT asset_main_type
+        TEXT asset_sub_type
+        TEXT quote_type
+        BIGINT ssid
+        BOOLEAN realtime
+        TIMESTAMPTZ first_seen_at
+        TIMESTAMPTZ last_seen_at
+    }
+
+    ods_instrument_fundamental_history {
+        BIGINT instrument_id PK, FK
+        TIMESTAMPTZ as_of_time PK
+        DOUBLE week_52_high
+        DOUBLE week_52_low
+        DOUBLE dividend_amount
+        DOUBLE dividend_yield
+        DOUBLE pe_ratio
+        DOUBLE market_cap
+        DOUBLE beta
+    }
+
+    ods_quote_history {
+        BIGINT instrument_id PK, FK
+        TIMESTAMPTZ as_of_time PK
+        DOUBLE ask_price
+        DOUBLE bid_price
+        DOUBLE last_price
+        DOUBLE open_price
+        DOUBLE high_price
+        DOUBLE low_price
+        BIGINT total_volume
+        TEXT security_status
+    }
+
+    ods_price_history_frequency_type {
+        SMALLINT id PK
+        TEXT code UK
+    }
+
+    ods_price_history {
+        BIGINT instrument_id PK, FK
+        SMALLINT frequency_type PK, FK
+        SMALLINT frequency PK
+        TIMESTAMPTZ candle_time PK
+        DOUBLE open
+        DOUBLE high
+        DOUBLE low
+        DOUBLE close
+        BIGINT volume
+        BOOLEAN need_extended_hours_data
+    }
+
+    ods_securities_account {
+        BIGSERIAL id PK
+        TEXT account_number UK
+        TEXT hash_value
+        account_type_enum account_type
+        INT round_trips
+        BOOLEAN is_day_trader
+        BOOLEAN is_closing_only_restricted
+        BOOLEAN pfcb_flag
+    }
+
+    ods_position {
+        TIMESTAMPTZ as_of_time PK
+        BIGINT account_id PK, FK
+        BIGINT instrument_id PK, FK
+        DOUBLE long_quantity
+        DOUBLE short_quantity
+        DOUBLE average_price
+        DOUBLE market_value
+        DOUBLE current_day_profit_loss
+    }
+
+    ods_account_initial_balances {
+        TIMESTAMPTZ as_of_time PK
+        BIGINT account_id PK, FK
+        NUMERIC cash_balance
+        NUMERIC liquidation_value
+        NUMERIC account_value
+        BOOLEAN is_in_call
+    }
+
+    ods_account_current_balances {
+        TIMESTAMPTZ as_of_time PK
+        BIGINT account_id PK, FK
+        NUMERIC cash_balance
+        NUMERIC liquidation_value
+        NUMERIC long_market_value
+        NUMERIC total_cash
+    }
+
+    ods_account_projected_balances {
+        TIMESTAMPTZ as_of_time PK
+        BIGINT account_id PK, FK
+        NUMERIC cash_available_for_trading
+        NUMERIC cash_available_for_withdrawal
+    }
+
+    ods_aggregated_balance {
+        TIMESTAMPTZ as_of_time PK
+        NUMERIC current_liquidation_value
+        NUMERIC liquidation_value
+    }
+
+    ods_orders {
+        BIGINT order_id PK
+        BIGINT account_id FK
+        TIMESTAMPTZ created_at
+        order_session_enum session
+        order_duration_enum duration
+        order_type_enum order_type
+        order_complex_strategy_enum complex_strategy
+        DOUBLE quantity
+        DOUBLE filled_quantity
+        DOUBLE remaining_quantity
+        order_dest_enum requested_destination
+        DOUBLE price
+        order_strategy_enum order_strategy
+        order_status_enum status
+        TIMESTAMPTZ entered_time
+        TIMESTAMPTZ close_time
+    }
+
+    ods_order_leg {
+        BIGINT order_id PK, FK
+        BIGINT leg_id PK
+        order_leg_type_enum order_leg_type
+        BIGINT instrument_id FK
+        order_instruction_enum instruction
+        order_position_effect_enum position_effect
+        DOUBLE quantity
+        order_quantity_type_enum quantity_type
+        order_div_cap_gains_enum div_cap_gains
+        TEXT to_symbol
+    }
+
+    ods_order_activity {
+        BIGINT order_id FK
+        BIGINT activity_id PK
+        order_activity_type_enum activity_type
+        order_execution_type_enum execution_type
+        DOUBLE quantity
+        DOUBLE order_remaining_quantity
+    }
+
+    ods_execution_leg {
+        BIGINT activity_id PK, FK
+        BIGINT leg_id PK
+        DOUBLE price
+        DOUBLE quantity
+        DOUBLE mismarked_quantity
+        BIGINT instrument_id
+        TIMESTAMPTZ exec_time
+    }
+
+    dwd_watch_list {
+        TEXT symbol PK
+        TEXT symbol_name
+        TEXT asset_type
+        BOOLEAN is_active
+        TIMESTAMPTZ added_at
+    }
+
+    ods_instrument ||--o{ ods_instrument_fundamental_history : has
+    ods_instrument ||--o{ ods_quote_history : has
+    ods_instrument ||--o{ ods_price_history : has
+    ods_price_history_frequency_type ||--o{ ods_price_history : classifies
+
+    ods_securities_account ||--o{ ods_position : holds
+    ods_instrument ||--o{ ods_position : values
+
+    ods_securities_account ||--o{ ods_account_initial_balances : has
+    ods_securities_account ||--o{ ods_account_current_balances : has
+    ods_securities_account ||--o{ ods_account_projected_balances : has
+
+    ods_securities_account ||--o{ ods_orders : places
+    ods_orders ||--o{ ods_order_leg : contains
+    ods_instrument ||--o{ ods_order_leg : references
+    ods_orders ||--o{ ods_order_activity : records
+    ods_order_activity ||--o{ ods_execution_leg : executes

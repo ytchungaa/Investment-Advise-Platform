@@ -121,7 +121,6 @@ def _build_instrument_df(positions_df: pd.DataFrame, as_of_time: pd.Timestamp) -
     instrument_df["realtime"] = pd.NA
     instrument_df["first_seen_at"] = as_of_time
     instrument_df["last_seen_at"] = as_of_time
-    instrument_df["source_payload"] = raw_instruments
     return instrument_df[
         [
             "symbol",
@@ -136,7 +135,6 @@ def _build_instrument_df(positions_df: pd.DataFrame, as_of_time: pd.Timestamp) -
             "realtime",
             "first_seen_at",
             "last_seen_at",
-            "source_payload",
         ]
     ].drop_duplicates(subset=["symbol", "asset_type"])
 
@@ -216,7 +214,6 @@ def get_account_data():
                 "ssid",
                 "realtime",
                 "last_seen_at",
-                "source_payload",
             ],
         )
 

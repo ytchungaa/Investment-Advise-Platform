@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Stock Visualization</title>
+    <link rel="stylesheet" href="/static/styles.css" />
+    <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+  </head>
+  <body>
+    <main class="page-shell">
+      <section class="hero">
+        <p class="eyebrow">Investment Analysis Platform</p>
+        <h1>Single-Stock Daily Price View</h1>
+        <p class="intro">
+          Visualize one stock at a time with a close-price time series and a
+          month-grouped daily return box plot.
+        </p>
+      </section>
+
+      <section class="control-panel">
+        <form id="stock-form" class="control-form">
+          <label>
+            Symbol
+            <input
+              id="symbol-input"
+              name="symbol"
+              type="text"
+              placeholder="AAPL"
+              autocomplete="off"
+              list="symbol-suggestion-list"
+              required
+              aria-describedby="symbol-help"
+            />
+            <datalist id="symbol-suggestion-list"></datalist>
+            <span id="symbol-help" class="field-help">
+              Type a ticker or company name to see matching symbols.
+            </span>
+          </label>
+          <label>
+            Start date
+            <input id="start-date-input" name="start_date" type="date" />
+          </label>
+          <label>
+            End date
+            <input id="end-date-input" name="end_date" type="date" />
+          </label>
+          <button type="submit">Load charts</button>
+        </form>
+        <div id="status-message" class="status-message" aria-live="polite"></div>
+        <div id="range-summary" class="range-summary"></div>
+      </section>
+
+      <section class="chart-grid">
+        <article class="chart-card">
+          <div class="card-header">
+            <h2>Daily Close Price</h2>
+            <p>Line chart across the selected date range.</p>
+          </div>
+          <div id="timeseries-chart" class="chart-surface empty-surface">
+            Enter a symbol to render the time series.
+          </div>
+        </article>
+        <article class="chart-card">
+          <div class="card-header">
+            <h2>Daily Return Distribution</h2>
+            <p>Box plots grouped by calendar month in Jan-Dec order.</p>
+          </div>
+          <div id="boxplot-chart" class="chart-surface empty-surface">
+            The box plot will appear here after the data loads.
+          </div>
+        </article>
+      </section>
+    </main>
+
+    <script src="/static/main.js"></script>
+  </body>
+</html>

@@ -158,5 +158,6 @@ SELECT
     ph.need_extended_hours_data
 FROM ods.price_history ph
 JOIN ods.instrument i ON i.id = ph.instrument_id
-WHERE ph.frequency_type = 'daily'
+JOIN ods.price_history_frequency_type pft ON pft.id = ph.frequency_type
+WHERE pft.code = 'daily'
   AND ph.frequency = 1;

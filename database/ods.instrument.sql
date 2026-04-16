@@ -22,11 +22,8 @@ CREATE TABLE IF NOT EXISTS ods.instrument (
     realtime BOOLEAN,
     first_seen_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     last_seen_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-    source_payload JSONB,
     UNIQUE (symbol, asset_type)
 );
-
-CREATE INDEX IF NOT EXISTS idx_instrument_symbol ON ods.instrument (symbol);
 
 CREATE TABLE IF NOT EXISTS ods.instrument_fundamental_history (
     instrument_id BIGINT NOT NULL REFERENCES ods.instrument(id) ON DELETE CASCADE,
@@ -86,7 +83,6 @@ CREATE TABLE IF NOT EXISTS ods.instrument_fundamental_history (
     next_dividend_pay_date TIMESTAMPTZ,
     next_dividend_date TIMESTAMPTZ,
     fund_leverage_factor DOUBLE PRECISION,
-    source_payload JSONB,
     PRIMARY KEY (instrument_id, as_of_time)
 );
 
@@ -124,7 +120,6 @@ CREATE TABLE IF NOT EXISTS ods.quote_history (
     trade_time TIMESTAMPTZ,
     security_status TEXT,
     total_volume BIGINT,
-    source_payload JSONB,
     PRIMARY KEY (instrument_id, as_of_time)
 );
 

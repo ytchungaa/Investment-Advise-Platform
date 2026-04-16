@@ -1,7 +1,21 @@
+CREATE TABLE IF NOT EXISTS ods.price_history_frequency_type (
+    id SMALLINT PRIMARY KEY,
+    code TEXT NOT NULL UNIQUE
+);
+
+INSERT INTO ods.price_history_frequency_type (id, code)
+VALUES
+    (1, 'minute'),
+    (2, 'daily'),
+    (3, 'weekly'),
+    (4, 'monthly')
+ON CONFLICT (id) DO UPDATE
+SET code = EXCLUDED.code;
+
 CREATE TABLE IF NOT EXISTS ods.price_history (
     instrument_id BIGINT NOT NULL REFERENCES ods.instrument(id) ON DELETE CASCADE,
-    frequency_type TEXT NOT NULL CHECK (frequency_type IN ('minute', 'daily', 'weekly', 'monthly')),
-    frequency INTEGER NOT NULL,
+    frequency_type SMALLINT NOT NULL REFERENCES ods.price_history_frequency_type(id),
+    frequency SMALLINT NOT NULL,
     candle_time TIMESTAMPTZ NOT NULL,
     open DOUBLE PRECISION,
     high DOUBLE PRECISION,
@@ -11,7 +25,6 @@ CREATE TABLE IF NOT EXISTS ods.price_history (
     previous_close DOUBLE PRECISION,
     previous_close_time TIMESTAMPTZ,
     need_extended_hours_data BOOLEAN NOT NULL DEFAULT TRUE,
-    source_payload JSONB,
     PRIMARY KEY (instrument_id, frequency_type, frequency, candle_time)
 );
 

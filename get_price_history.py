@@ -6,6 +6,7 @@ import pandas as pd  # Ensure pandas is imported and 'pd' is not redefined elsew
 import datetime
 import sqlalchemy as sa
 from database_connect import connector
+from get_market_data import get_price_history_frequency_type_id
 
 
 class schwab_api_market:
@@ -38,6 +39,7 @@ class schwab_api_market:
             'weekly': ['1'],
             'monthly': ['1']
         }
+        frequency_type_id = get_price_history_frequency_type_id(frequency_type)
         if period_type not in ['day', 'month', 'year', 'ytd'] or period not in valid_periods.get(period_type, []):
             raise ValueError("period_type must be one of 'day', 'month', 'year', 'ytd' with valid period values")
         if frequency_type not in ['minute', 'daily', 'weekly', 'monthly'] or frequency not in valid_frequencies.get(frequency_type, []):
@@ -62,6 +64,8 @@ class schwab_api_market:
             return pd.DataFrame()  # Make sure 'pd' is pandas and not a local variable
         df = pd.json_normalize(response.json()['candles'])
         df['symbol'] = response.json().get('symbol', symbol)
+        df['frequency_type'] = frequency_type_id
+        df['frequency'] = int(frequency)
         return df
 
 if __name__ == "__main__":

@@ -35,8 +35,7 @@ CREATE TABLE IF NOT EXISTS ods.orders (
   status             order_status_enum,
   entered_time       TIMESTAMPTZ,
   close_time         TIMESTAMPTZ,
-  tag                TEXT,         -- e.g. API_TOS:FUNDAMENTALS / POS_STMT  
-  account_number     TEXT NOT NULL -- denormalized for quick joins / validation  
+  tag                TEXT          -- e.g. API_TOS:FUNDAMENTALS / POS_STMT  
 );
 
 -- ====== ORDER LEGS (EQUITY / FIXED_INCOME etc., per legId)
