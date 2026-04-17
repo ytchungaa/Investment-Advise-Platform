@@ -32,10 +32,32 @@ class schwab_api_market:
         self.access_token = self.auth.get_token()
         self.server_link = "https://api.schwabapi.com/marketdata/v1"
         self.session = requests.Session()
+        self.max_request_attempts = 6
+        self.rate_limit_backoff_cap_seconds = 60.0
+        self.rate_limit_cooldown_seconds = 120.0
+        self.rate_limit_cooldown_until = 0.0
+        self.consecutive_rate_limit_hits = 0
+
+    def _sleep_if_rate_limited(self) -> None:
+        remaining_seconds = self.rate_limit_cooldown_until - time.monotonic()
+        if remaining_seconds > 0:
+            logger.warning(
+                "Rate-limit cooldown active. Sleeping for %.1f seconds before next request.",
+                remaining_seconds,
+            )
+            time.sleep(remaining_seconds)
+
+    def _activate_rate_limit_cooldown(self, cooldown_seconds: float | None = None) -> None:
+        sleep_seconds = max(float(cooldown_seconds or self.rate_limit_cooldown_seconds), 0.0)
+        self.rate_limit_cooldown_until = max(
+            self.rate_limit_cooldown_until,
+            time.monotonic() + sleep_seconds,
+        )
 
     def _request(self, path: str, params: dict) -> dict:
-        max_attempts = 4
+        max_attempts = max(int(self.max_request_attempts), 1)
         for attempt in range(max_attempts):
+            self._sleep_if_rate_limited()
             try:
                 response = self.session.get(
                     f"{self.server_link}{path}",
@@ -60,17 +82,45 @@ class schwab_api_market:
                 continue
 
             if response.status_code == 429 and attempt < max_attempts - 1:
+                self.consecutive_rate_limit_hits += 1
                 retry_after_header = response.headers.get("Retry-After")
                 try:
                     retry_after_seconds = float(retry_after_header) if retry_after_header else 0.0
                 except ValueError:
                     retry_after_seconds = 0.0
-                sleep_seconds = retry_after_seconds or min(2**attempt, 8)
+                sleep_seconds = retry_after_seconds or min(
+                    2**attempt, self.rate_limit_backoff_cap_seconds
+                )
+                cooldown_seconds = max(
+                    self.rate_limit_cooldown_seconds,
+                    sleep_seconds * max(self.consecutive_rate_limit_hits, 1),
+                )
+                self._activate_rate_limit_cooldown(cooldown_seconds)
                 logger.warning(
-                    f"Received 429 for {path}. Retrying in {sleep_seconds} seconds."
+                    "Received 429 for %s. Retrying in %.1f seconds and enabling %.1f-second cooldown.",
+                    path,
+                    sleep_seconds,
+                    cooldown_seconds,
                 )
                 time.sleep(sleep_seconds)
                 continue
+
+            if response.status_code == 429:
+                self.consecutive_rate_limit_hits += 1
+                cooldown_seconds = max(
+                    self.rate_limit_cooldown_seconds,
+                    self.rate_limit_backoff_cap_seconds,
+                )
+                self._activate_rate_limit_cooldown(cooldown_seconds)
+                logger.error(
+                    "Received repeated 429 responses for %s. Activated %.1f-second cooldown before failing.",
+                    path,
+                    cooldown_seconds,
+                )
+                return {}
+
+            self.consecutive_rate_limit_hits = 0
+            self.rate_limit_cooldown_until = 0.0
 
             if 500 <= response.status_code < 600 and attempt < max_attempts - 1:
                 sleep_seconds = min(2**attempt, 8)
@@ -115,6 +165,11 @@ class schwab_api_market:
         if value == "":
             return pd.NaT
         return pd.to_datetime(value, utc=True, errors="coerce")
+
+    @staticmethod
+    def _request_time_to_epoch_millis(value) -> int:
+        timestamp = pd.to_datetime(value, utc=True, errors="raise")
+        return int(timestamp.timestamp() * 1000)
 
     @staticmethod
     def _normalize_asset_type(asset_type: str | None, instrument_type: str | None = None) -> str | None:
@@ -341,12 +396,8 @@ class schwab_api_market:
         if frequency_type == "minute" and period_type != "day":
             raise ValueError("Schwab minute history requires period_type='day'")
 
-        start_timestamp = int(
-            datetime.datetime.strptime(start_date, "%Y-%m-%d").timestamp() * 1000
-        )
-        end_timestamp = int(
-            datetime.datetime.strptime(end_date, "%Y-%m-%d").timestamp() * 1000
-        )
+        start_timestamp = self._request_time_to_epoch_millis(start_date)
+        end_timestamp = self._request_time_to_epoch_millis(end_date)
         payload = self._request(
             "/pricehistory",
             {
@@ -425,13 +476,13 @@ if __name__ == "__main__":
     api = schwab_api_market()
     df = api.fetch_price_history(
         symbol="AAPL",
-        period_type="month",
-        period="1",
-        frequency_type="daily",
-        frequency="1",
-        start_date="2025-01-01",
-        end_date="2025-01-31",
+        period_type="day",
+        period="10",
+        frequency_type="minute",
+        frequency="5",
+        start_date="2025-07-01",
+        end_date="2025-07-28",
         need_extended_hours_data=True,
         need_previous_close=True,
     )
-    print(df.head())
+    print(df.head(100))

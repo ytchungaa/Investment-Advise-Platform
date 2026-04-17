@@ -39,6 +39,12 @@ class connector:
         self.db_name = db_name
         self.schema = schema
 
+    def _rollback_quietly(self) -> None:
+        try:
+            self.connection.rollback()
+        except Exception as rollback_error:
+            logger.error(f"Error rolling back transaction: {rollback_error}")
+
     def execute(self, query: str, params: dict | None = None, commit: bool = True):
         cursor = self.connection.execute(text(query), params or {})
         if commit:
@@ -53,6 +59,7 @@ class connector:
         try:
             return pd.read_sql_query(text(query), self.connection, params=params or {})
         except Exception as e:
+            self._rollback_quietly()
             logger.error(f"Error executing query: {e}")
             return pd.DataFrame()
 
@@ -74,6 +81,7 @@ class connector:
             )
             return df["column_name"].tolist()
         except Exception as e:
+            self._rollback_quietly()
             logger.error(f"Error fetching columns for table '{table_name}': {e}")
             return []
 
