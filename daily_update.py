@@ -20,8 +20,16 @@ PRICE_HISTORY_UPDATE_COLUMNS = [
     "previous_close_time",
     "need_extended_hours_data",
 ]
-DEFAULT_PRICE_HISTORY_WORKERS = 4
+DEFAULT_PRICE_HISTORY_WORKERS = 8
 _THREAD_LOCAL = threading.local()
+
+
+def _log_stage(stage: str, **details) -> None:
+    if details:
+        detail_text = ", ".join(f"{key}={value}" for key, value in details.items())
+        logger.info("%s | %s", stage, detail_text)
+        return
+    logger.info("%s", stage)
 
 
 def _format_timestamp_for_request(timestamp: pd.Timestamp) -> str:
@@ -178,11 +186,13 @@ def _filter_price_history_to_time_window(
     )
 
 
-def _get_thread_api() -> schwab_api_market:
+def _get_thread_api(access_token: str | None = None) -> schwab_api_market:
     api = getattr(_THREAD_LOCAL, "schwab_api_market", None)
     if api is None:
-        api = schwab_api_market()
+        api = schwab_api_market(access_token=access_token)
         _THREAD_LOCAL.schwab_api_market = api
+    elif access_token is not None and api.access_token != access_token:
+        api.access_token = access_token
     return api
 
 
@@ -191,12 +201,13 @@ def _fetch_symbol_price_history(
     instrument_id: int,
     start_timestamp: pd.Timestamp,
     end_timestamp: pd.Timestamp,
+    access_token: str,
     period_type: str,
     frequency: str,
     need_extended_hours_data: bool,
     need_previous_close: bool,
 ) -> pd.DataFrame:
-    api = _get_thread_api()
+    api = _get_thread_api(access_token=access_token)
     request_windows = _iter_forward_request_windows(start_timestamp, end_timestamp)
     symbol_frames: list[pd.DataFrame] = []
 
@@ -271,13 +282,25 @@ def stock_list_market_data(
         raise ValueError("start_date and end_date must be valid timestamps")
     requested_end_timestamp = min(requested_end_timestamp, explicit_end_timestamp)
 
+    _log_stage(
+        "Starting market data update",
+        symbols=len(symbols),
+        start=requested_start_timestamp,
+        end=requested_end_timestamp,
+        extended_hours=need_extended_hours_data,
+        previous_close=need_previous_close,
+    )
+
     api = schwab_api_market()
 
+    _log_stage("Fetching instruments", symbols=len(symbols))
     instruments_df = api.fetch_instruments(symbols)
     if instruments_df.empty:
         logger.error("Failed to fetch instruments from Schwab API.")
         return {}
+    _log_stage("Fetched instruments", rows=len(instruments_df))
 
+    _log_stage("Upserting instruments", rows=len(instruments_df))
     db_ods.upsert_dataframe(
         instruments_df,
         table_name="instrument",
@@ -286,7 +309,13 @@ def stock_list_market_data(
         chunksize=100,
     )
 
+    _log_stage("Fetching quotes", symbols=len(symbols))
     quote_instrument_updates_df, quotes_df = api.fetch_quotes(symbols)
+    _log_stage(
+        "Fetched quotes",
+        quote_rows=len(quotes_df),
+        instrument_update_rows=len(quote_instrument_updates_df),
+    )
     if not quote_instrument_updates_df.empty:
         instrument_lookup_for_update = db_ods.query_dataframe(
             "SELECT symbol, asset_type FROM instrument;"
@@ -296,6 +325,10 @@ def stock_list_market_data(
             on="symbol",
             how="left",
         ).dropna(subset=["asset_type"])
+        _log_stage(
+            "Upserting quote-driven instrument updates",
+            rows=len(quote_instrument_updates_df),
+        )
         db_ods.upsert_dataframe(
             quote_instrument_updates_df,
             table_name="instrument",
@@ -314,7 +347,9 @@ def stock_list_market_data(
         how="left",
     )
 
+    _log_stage("Fetching instrument fundamentals", symbols=len(symbols))
     fundamentals_df = api.fetch_instrument_fundamentals(symbols)
+    _log_stage("Fetched instrument fundamentals", rows=len(fundamentals_df))
     if not fundamentals_df.empty:
         fundamentals_df = fundamentals_df.merge(
             instrument_lookup,
@@ -322,6 +357,7 @@ def stock_list_market_data(
             how="left",
         ).dropna(subset=["instrument_id"])
         fundamentals_df["instrument_id"] = fundamentals_df["instrument_id"].astype("int64")
+        _log_stage("Inserting instrument fundamentals", rows=len(fundamentals_df))
         db_ods.insert_dataframe(
             fundamentals_df.drop(columns=["symbol", "asset_type"]),
             table_name="instrument_fundamental_history",
@@ -335,6 +371,7 @@ def stock_list_market_data(
             how="left",
         ).dropna(subset=["instrument_id"])
         quotes_df["instrument_id"] = quotes_df["instrument_id"].astype("int64")
+        _log_stage("Inserting quotes", rows=len(quotes_df))
         db_ods.insert_dataframe(
             quotes_df.drop(columns=["symbol"]),
             table_name="quote_history",
@@ -375,6 +412,14 @@ def stock_list_market_data(
             }
         )
 
+    _log_stage(
+        "Planned minute history fetch",
+        jobs=len(price_history_jobs),
+        existing_history_symbols=symbols_with_existing_minute_history,
+        already_current_symbols=symbols_already_current,
+        target_end=requested_end_timestamp,
+    )
+
     if price_history_jobs:
         worker_count = min(max_price_history_workers, len(price_history_jobs))
         logger.info(
@@ -390,6 +435,7 @@ def stock_list_market_data(
                     instrument_id=job["instrument_id"],
                     start_timestamp=job["start_timestamp"],
                     end_timestamp=requested_end_timestamp,
+                    access_token=api.access_token,
                     period_type=period_type,
                     frequency=MINUTE_FREQUENCY,
                     need_extended_hours_data=need_extended_hours_data,
@@ -397,6 +443,7 @@ def stock_list_market_data(
                 ): job
                 for job in price_history_jobs
             }
+            completed_jobs = 0
             for future in as_completed(future_to_job):
                 job = future_to_job[future]
                 symbol = job["symbol"]
@@ -409,11 +456,28 @@ def stock_list_market_data(
 
                 if price_df.empty:
                     logger.warning(f"No 1-minute price history returned for symbol '{symbol}'.")
+                    completed_jobs += 1
+                    _log_stage(
+                        "Minute history progress",
+                        completed=completed_jobs,
+                        total=len(price_history_jobs),
+                        symbol=symbol,
+                        rows=0,
+                    )
                     continue
                 price_frames.append(price_df)
+                completed_jobs += 1
+                _log_stage(
+                    "Minute history progress",
+                    completed=completed_jobs,
+                    total=len(price_history_jobs),
+                    symbol=symbol,
+                    rows=len(price_df),
+                )
 
     if price_frames:
         price_history_df = pd.concat(price_frames, ignore_index=True)
+        _log_stage("Upserting minute price history", rows=len(price_history_df))
         success = db_ods.upsert_dataframe(
             price_history_df,
             table_name="price_history",

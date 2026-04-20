@@ -27,9 +27,9 @@ def get_price_history_frequency_type_id(frequency_type: str) -> int:
 
 
 class schwab_api_market:
-    def __init__(self):
-        self.auth = SchwabAuth()
-        self.access_token = self.auth.get_token()
+    def __init__(self, access_token: str | None = None, auth: SchwabAuth | None = None):
+        self.auth = auth or SchwabAuth()
+        self.access_token = access_token or self.auth.get_token()
         self.server_link = "https://api.schwabapi.com/marketdata/v1"
         self.session = requests.Session()
         self.max_request_attempts = 6

@@ -10,7 +10,7 @@ import json
 
 class SchwabAuth:
     def __init__(self, redirect_uri = "https://127.0.0.1"):
-        dotenv.load_dotenv()
+        dotenv.load_dotenv(override=True)
         self.dotenv_path = dotenv.find_dotenv()
         self.client_id = os.getenv("SCHWAB_CLIENT_ID")
         self.client_secret = os.getenv("SCHWAB_CLIENT_SECRET")
@@ -20,11 +20,15 @@ class SchwabAuth:
         self.refresh_token_expire = os.getenv("SCHWAB_REFRESH_TOKEN_EXPIRES_TIMES")
         self.redirect_uri = redirect_uri
 
+    def _persist_env_value(self, key: str, value: str) -> None:
+        dotenv.set_key(self.dotenv_path, key, value)
+        os.environ[key] = value
+
     def update_client_id_secret(self,) -> bool:
         client_id = input("Enter your Schwab Client ID: ").strip()
         client_secret = input("Enter your Schwab Client Secret: ").strip()
-        dotenv.set_key(self.dotenv_path, "SCHWAB_CLIENT_ID", client_id)
-        dotenv.set_key(self.dotenv_path, "SCHWAB_CLIENT_SECRET", client_secret)
+        self._persist_env_value("SCHWAB_CLIENT_ID", client_id)
+        self._persist_env_value("SCHWAB_CLIENT_SECRET", client_secret)
         self.client_id = client_id
         self.client_secret = client_secret
         return True
@@ -77,14 +81,14 @@ class SchwabAuth:
         
         if to_prase:
             access_token_expire = (datetime.now() + timedelta(seconds=post_result["expires_in"])).strftime("%Y-%m-%d %H:%M:%S")
-            dotenv.set_key(self.dotenv_path, "SCHWAB_ACCESS_TOKEN", post_result["access_token"])
-            dotenv.set_key(self.dotenv_path, "SCHWAB_ACCESS_TOKEN_EXPIRES_TIMES", access_token_expire)
+            self._persist_env_value("SCHWAB_ACCESS_TOKEN", post_result["access_token"])
+            self._persist_env_value("SCHWAB_ACCESS_TOKEN_EXPIRES_TIMES", access_token_expire)
             self.access_token = post_result["access_token"]
             self.access_token_expire = access_token_expire
 
             refresh_token_expire = (datetime.now() + timedelta(days=7)).strftime("%Y-%m-%d %H:%M:%S")
-            dotenv.set_key(self.dotenv_path, "SCHWAB_REFRESH_TOKEN", post_result["refresh_token"])
-            dotenv.set_key(self.dotenv_path, "SCHWAB_REFRESH_TOKEN_EXPIRES_TIMES", refresh_token_expire)
+            self._persist_env_value("SCHWAB_REFRESH_TOKEN", post_result["refresh_token"])
+            self._persist_env_value("SCHWAB_REFRESH_TOKEN_EXPIRES_TIMES", refresh_token_expire)
             self.refresh_token = post_result["refresh_token"]
             self.refresh_token_expire = refresh_token_expire
             logger.info(f"Access token obtained successfully. Expires at {access_token_expire}")
@@ -107,8 +111,8 @@ class SchwabAuth:
 
         if to_prase:
             access_token_expire = (datetime.now() + timedelta(seconds=post_result['expires_in'])).strftime("%Y-%m-%d %H:%M:%S")
-            dotenv.set_key(self.dotenv_path, "SCHWAB_ACCESS_TOKEN", post_result['access_token'])
-            dotenv.set_key(self.dotenv_path, "SCHWAB_ACCESS_TOKEN_EXPIRES_TIMES", access_token_expire)
+            self._persist_env_value("SCHWAB_ACCESS_TOKEN", post_result['access_token'])
+            self._persist_env_value("SCHWAB_ACCESS_TOKEN_EXPIRES_TIMES", access_token_expire)
             self.access_token = post_result['access_token']
             self.access_token_expire = access_token_expire
             logger.info(f"Access token refreshed successfully. Expires at {access_token_expire}")
