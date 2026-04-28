@@ -16,7 +16,7 @@ logger.setLevel(logging.DEBUG)  # keep lowest here so handlers decide filtering
 # Console handler (debug+ above)
 ch = logging.StreamHandler(sys.stdout)
 ch.setLevel(logging.DEBUG)  # show debug+ in console
-ch.setFormatter(logging.Formatter("%(asctime)s | %(levelname)s | %(message)s", datefmt="%H:%M:%S"))
+ch.setFormatter(logging.Formatter("%(asctime)s | %(levelname)s | %(message)s", datefmt="%Y-%m-%d %H:%M:%S"))
 logger.addHandler(ch)
 
 # File handler (warning+ above)
