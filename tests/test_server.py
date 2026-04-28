@@ -37,10 +37,7 @@ class ServerApiTests(unittest.TestCase):
                     "volume": 1400,
                 },
             ],
-            "monthly_return_boxes": [
-                {"month_number": 4, "month_label": "Apr", "returns": [0.01, -0.002]}
-            ],
-            "summary": {"price_points": 2, "return_points": 2},
+            "summary": {"price_points": 2},
             "message": None,
         }
 
@@ -71,8 +68,7 @@ class ServerApiTests(unittest.TestCase):
             "available_range": {"start": "2023-01-03", "end": "2026-04-15"},
             "selected_range": {"start": "2020-01-01", "end": "2020-12-31"},
             "timeseries": [],
-            "monthly_return_boxes": [],
-            "summary": {"price_points": 0, "return_points": 0},
+            "summary": {"price_points": 0},
             "message": "No daily price history is available for the selected range.",
         }
 
@@ -85,35 +81,6 @@ class ServerApiTests(unittest.TestCase):
         self.assertIsNotNone(response.get_json()["message"])
 
     @patch("app.server.get_stock_visualization_data")
-    def test_one_row_result_has_empty_monthly_return_boxes(self, mocked_service):
-        mocked_service.return_value = {
-            "symbol": "AAPL",
-            "description": "Apple Inc.",
-            "available_range": {"start": "2026-04-15", "end": "2026-04-15"},
-            "selected_range": {"start": "2026-04-15", "end": "2026-04-15"},
-            "timeseries": [
-                {
-                    "date": "2026-04-15",
-                    "close": 212.0,
-                    "open": 210.0,
-                    "high": 213.5,
-                    "low": 209.8,
-                    "volume": 1400,
-                }
-            ],
-            "monthly_return_boxes": [],
-            "summary": {"price_points": 1, "return_points": 0},
-            "message": "Return distribution is unavailable because fewer than two price points were found in the selected range.",
-        }
-
-        response = self.client.get(
-            "/api/stock-data?symbol=AAPL&start_date=2026-04-15&end_date=2026-04-15"
-        )
-
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.get_json()["monthly_return_boxes"], [])
-
-    @patch("app.server.get_stock_visualization_data")
     def test_default_date_range_is_used_when_query_params_are_omitted(self, mocked_service):
         mocked_service.return_value = {
             "symbol": "AAPL",
@@ -121,8 +88,7 @@ class ServerApiTests(unittest.TestCase):
             "available_range": {"start": "2025-01-01", "end": "2026-04-15"},
             "selected_range": {"start": "2025-04-15", "end": "2026-04-15"},
             "timeseries": [],
-            "monthly_return_boxes": [],
-            "summary": {"price_points": 0, "return_points": 0},
+            "summary": {"price_points": 0},
             "message": None,
         }
 

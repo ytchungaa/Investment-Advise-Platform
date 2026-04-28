@@ -13,8 +13,8 @@
         <p class="eyebrow">Investment Analysis Platform</p>
         <h1>Single-Stock Daily Price View</h1>
         <p class="intro">
-          Visualize one stock at a time with a close-price time series and a
-          month-grouped daily return box plot.
+          Visualize one stock at a time with a daily candlestick chart across
+          your selected date range.
         </p>
       </section>
 
@@ -22,17 +22,26 @@
         <form id="stock-form" class="control-form">
           <label>
             Symbol
-            <input
-              id="symbol-input"
-              name="symbol"
-              type="text"
-              placeholder="AAPL"
-              autocomplete="off"
-              list="symbol-suggestion-list"
-              required
-              aria-describedby="symbol-help"
-            />
-            <datalist id="symbol-suggestion-list"></datalist>
+            <div class="combobox" id="symbol-combobox">
+              <input
+                id="symbol-input"
+                name="symbol"
+                type="text"
+                placeholder="AAPL"
+                autocomplete="off"
+                required
+                aria-describedby="symbol-help"
+                aria-autocomplete="list"
+                aria-controls="symbol-suggestion-list"
+                aria-expanded="false"
+                role="combobox"
+              />
+              <div
+                id="symbol-suggestion-list"
+                class="suggestion-list"
+                role="listbox"
+              ></div>
+            </div>
             <span id="symbol-help" class="field-help">
               Type a ticker or company name to see matching symbols.
             </span>
@@ -54,20 +63,11 @@
       <section class="chart-grid">
         <article class="chart-card">
           <div class="card-header">
-            <h2>Daily Close Price</h2>
-            <p>Line chart across the selected date range.</p>
+            <h2>Daily Candlestick Chart</h2>
+            <p>Open, high, low, and close across the selected date range.</p>
           </div>
           <div id="timeseries-chart" class="chart-surface empty-surface">
-            Enter a symbol to render the time series.
-          </div>
-        </article>
-        <article class="chart-card">
-          <div class="card-header">
-            <h2>Daily Return Distribution</h2>
-            <p>Box plots grouped by calendar month in Jan-Dec order.</p>
-          </div>
-          <div id="boxplot-chart" class="chart-surface empty-surface">
-            The box plot will appear here after the data loads.
+            Enter a symbol to render the candlestick chart.
           </div>
         </article>
       </section>

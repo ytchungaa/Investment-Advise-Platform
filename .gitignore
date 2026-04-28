@@ -20,3 +20,6 @@ tokens/
 .vscode/
 
 *.session.sql
+
+# Test files
+tests/

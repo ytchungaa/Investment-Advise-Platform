@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import calendar
+from calendar import monthrange
 import sys
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta, timezone
@@ -42,6 +42,13 @@ def _utc_today() -> date:
     return datetime.now(timezone.utc).date()
 
 
+def _subtract_one_calendar_month(value: date) -> date:
+    target_year = value.year if value.month > 1 else value.year - 1
+    target_month = value.month - 1 if value.month > 1 else 12
+    target_day = min(value.day, monthrange(target_year, target_month)[1])
+    return date(target_year, target_month, target_day)
+
+
 def _parse_optional_date(value: str | None, field_name: str) -> date | None:
     if value in (None, ""):
         return None
@@ -68,7 +75,7 @@ def _resolve_selected_range(
         return requested_start, requested_end
 
     default_end = _utc_today()
-    default_start = default_end - timedelta(days=365)
+    default_start = _subtract_one_calendar_month(default_end)
 
     selected_start = requested_start or default_start
     selected_end = requested_end or default_end
@@ -233,35 +240,6 @@ def _build_timeseries(price_df: pd.DataFrame) -> list[dict[str, Any]]:
     return records
 
 
-def _build_monthly_return_boxes(price_df: pd.DataFrame) -> list[dict[str, Any]]:
-    if len(price_df) < 2:
-        return []
-
-    working_df = price_df.copy()
-    working_df["daily_return"] = working_df["close"].div(working_df["close"].shift(1)) - 1
-    working_df = working_df.dropna(subset=["daily_return"])
-    if working_df.empty:
-        return []
-
-    working_df["month_number"] = pd.to_datetime(working_df["trade_date"]).dt.month
-
-    boxes: list[dict[str, Any]] = []
-    for month_number in range(1, 13):
-        month_returns = working_df.loc[
-            working_df["month_number"] == month_number, "daily_return"
-        ].tolist()
-        if not month_returns:
-            continue
-        boxes.append(
-            {
-                "month_number": month_number,
-                "month_label": calendar.month_abbr[month_number],
-                "returns": [float(value) for value in month_returns],
-            }
-        )
-    return boxes
-
-
 def get_stock_visualization_data(
     symbol: str,
     start_date: str | None = None,
@@ -291,16 +269,10 @@ def get_stock_visualization_data(
     )
 
     timeseries = _build_timeseries(price_df)
-    monthly_return_boxes = _build_monthly_return_boxes(price_df)
 
     message: str | None = None
     if price_df.empty:
         message = "No daily price history is available for the selected range."
-    elif len(price_df) < 2:
-        message = (
-            "Return distribution is unavailable because fewer than two price points "
-            "were found in the selected range."
-        )
 
     return {
         "symbol": instrument.symbol,
@@ -314,10 +286,8 @@ def get_stock_visualization_data(
             "end": _date_to_str(selected_end),
         },
         "timeseries": timeseries,
-        "monthly_return_boxes": monthly_return_boxes,
         "summary": {
             "price_points": len(timeseries),
-            "return_points": sum(len(box["returns"]) for box in monthly_return_boxes),
         },
         "message": message,
     }
