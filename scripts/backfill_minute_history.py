@@ -230,7 +230,7 @@ def backfill_minute_history(
     rate_limit_cooldown_seconds: float = 120.0,
     need_extended_hours_data: bool = True,
     need_previous_close: bool = True,
-    delete_covered_daily_data: bool = True,
+    delete_covered_daily_data: bool = False,
 ) -> dict:
     if stop_after_empty_windows < 1:
         raise ValueError("stop_after_empty_windows must be at least 1")
@@ -468,7 +468,7 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--delete-covered-daily-data",
         action=argparse.BooleanOptionalAction,
-        default=True,
+        default=False,
         help="Delete daily rows whose trade dates are covered by minute data.",
     )
     return parser

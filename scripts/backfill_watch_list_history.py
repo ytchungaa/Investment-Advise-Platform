@@ -112,17 +112,6 @@ def _load_symbols(db_ods: connector, db_dwd: connector) -> list[str]:
     return instrument_df["symbol"].dropna().drop_duplicates().tolist()
 
 
-def _truncate_price_history_if_needed(db_ods: connector) -> bool:
-    existing_data_df = db_ods.query_dataframe("SELECT 1 AS has_data FROM price_history LIMIT 1;")
-    if existing_data_df.empty:
-        logger.info("ods.price_history is empty. Skipping truncate.")
-        return False
-
-    db_ods.execute("TRUNCATE TABLE price_history;")
-    logger.info("Truncated existing rows from ods.price_history.")
-    return True
-
-
 def backfill_watch_list_history(
     start_date: str = DEFAULT_START_DATE,
     end_date: str | None = None,
@@ -171,8 +160,6 @@ def backfill_watch_list_history(
     )
     if instrument_lookup.empty:
         raise RuntimeError("No instrument ids were resolved for the requested symbols.")
-
-    truncated = _truncate_price_history_if_needed(db_ods)
 
     total_price_rows = 0
     symbols_loaded = 0
@@ -246,7 +233,7 @@ def backfill_watch_list_history(
         "price_rows_loaded": total_price_rows,
         "start_date": normalized_start_date,
         "end_date": normalized_end_date,
-        "truncated_existing_price_history": truncated,
+        "preserved_existing_price_history": True,
     }
     logger.info("Daily history backfill completed: %s", summary)
     return summary

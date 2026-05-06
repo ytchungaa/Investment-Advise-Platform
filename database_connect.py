@@ -99,7 +99,7 @@ class connector:
         return {
             column: JSONB
             for column in df.columns
-            if column == "request_params"
+            if column in {"request_params", "raw_payload"}
         }
 
     def insert_dataframe(

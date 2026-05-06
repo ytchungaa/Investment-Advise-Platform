@@ -201,6 +201,7 @@ def _fetch_symbol_price_history(
     instrument_id: int,
     start_timestamp: pd.Timestamp,
     end_timestamp: pd.Timestamp,
+    include_start_timestamp: bool,
     access_token: str,
     period_type: str,
     frequency: str,
@@ -231,7 +232,7 @@ def _fetch_symbol_price_history(
             window_df,
             lower_bound=lower_bound,
             upper_bound=end_timestamp,
-            include_lower_bound=window_index != 0,
+            include_lower_bound=include_start_timestamp if window_index == 0 else True,
         )
         if window_df.empty:
             continue
@@ -391,8 +392,10 @@ def stock_list_market_data(
         if latest_minute_history is not None:
             symbols_with_existing_minute_history += 1
             start_timestamp = max(requested_start_timestamp, latest_minute_history)
+            include_start_timestamp = start_timestamp != latest_minute_history
         else:
             start_timestamp = requested_start_timestamp
+            include_start_timestamp = True
 
         request_windows = _iter_forward_request_windows(start_timestamp, requested_end_timestamp)
         if not request_windows:
@@ -409,6 +412,7 @@ def stock_list_market_data(
                 "symbol": symbol,
                 "instrument_id": instrument_id,
                 "start_timestamp": start_timestamp,
+                "include_start_timestamp": include_start_timestamp,
             }
         )
 
@@ -435,6 +439,7 @@ def stock_list_market_data(
                     instrument_id=job["instrument_id"],
                     start_timestamp=job["start_timestamp"],
                     end_timestamp=requested_end_timestamp,
+                    include_start_timestamp=job["include_start_timestamp"],
                     access_token=api.access_token,
                     period_type=period_type,
                     frequency=MINUTE_FREQUENCY,

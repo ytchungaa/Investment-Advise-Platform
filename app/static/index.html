@@ -11,67 +11,273 @@
     <main class="page-shell">
       <section class="hero">
         <p class="eyebrow">Investment Analysis Platform</p>
-        <h1>Single-Stock Daily Price View</h1>
+        <h1>Portfolio Analytics</h1>
         <p class="intro">
-          Visualize one stock at a time with a daily candlestick chart across
-          your selected date range.
+          Track current holdings, allocation, and benchmark risk alongside
+          the single-stock chart workflow.
         </p>
       </section>
 
-      <section class="control-panel">
-        <form id="stock-form" class="control-form">
-          <label>
-            Symbol
-            <div class="combobox" id="symbol-combobox">
-              <input
-                id="symbol-input"
-                name="symbol"
-                type="text"
-                placeholder="AAPL"
-                autocomplete="off"
-                required
-                aria-describedby="symbol-help"
-                aria-autocomplete="list"
-                aria-controls="symbol-suggestion-list"
-                aria-expanded="false"
-                role="combobox"
-              />
-              <div
-                id="symbol-suggestion-list"
-                class="suggestion-list"
-                role="listbox"
-              ></div>
+      <nav class="app-tabs" aria-label="Application views">
+        <button
+          id="stock-tab-button"
+          class="app-tab is-active"
+          type="button"
+          data-app-tab="stock"
+          aria-controls="stock-view"
+          aria-selected="true"
+        >
+          Stock View
+        </button>
+        <button
+          id="portfolio-tab-button"
+          class="app-tab"
+          type="button"
+          data-app-tab="portfolio"
+          aria-controls="portfolio-view"
+          aria-selected="false"
+        >
+          Portfolio
+        </button>
+      </nav>
+
+      <section id="stock-view" class="app-view is-active" aria-labelledby="stock-tab-button">
+        <section class="control-panel">
+          <form id="stock-form" class="control-form">
+            <label>
+              Symbol
+              <div class="combobox" id="symbol-combobox">
+                <input
+                  id="symbol-input"
+                  name="symbol"
+                  type="text"
+                  placeholder="AAPL"
+                  autocomplete="off"
+                  required
+                  aria-autocomplete="list"
+                  aria-controls="symbol-suggestion-list"
+                  aria-expanded="false"
+                  role="combobox"
+                />
+                <div
+                  id="symbol-suggestion-list"
+                  class="suggestion-list"
+                  role="listbox"
+                ></div>
+              </div>
+            </label>
+            <label>
+              Start date
+              <input id="start-date-input" name="start_date" type="date" />
+            </label>
+            <label>
+              End date
+              <input id="end-date-input" name="end_date" type="date" />
+            </label>
+            <fieldset class="range-field">
+              <legend>Range</legend>
+              <div class="range-preset-group" aria-label="Date range presets">
+                <button type="button" data-range-preset="1d">1D</button>
+                <button type="button" data-range-preset="7d">7D</button>
+                <button type="button" data-range-preset="1m">1M</button>
+                <button type="button" data-range-preset="3m">3M</button>
+                <button type="button" data-range-preset="6m">6M</button>
+                <button type="button" data-range-preset="ytd">YTD</button>
+                <button type="button" data-range-preset="1y">1Y</button>
+                <button type="button" data-range-preset="5y">5Y</button>
+              </div>
+            </fieldset>
+            <fieldset class="interval-field">
+              <legend>View</legend>
+              <div class="segmented-control" role="radiogroup" aria-label="Price interval">
+                <input
+                  id="interval-hourly"
+                  name="interval"
+                  type="radio"
+                  value="hourly"
+                  checked
+                />
+                <label for="interval-hourly">Hourly</label>
+                <input
+                  id="interval-daily"
+                  name="interval"
+                  type="radio"
+                  value="daily"
+                />
+                <label for="interval-daily">Daily</label>
+              </div>
+            </fieldset>
+            <div class="action-group">
+              <button type="submit">Load charts</button>
+              <button id="refresh-data-button" class="secondary-button" type="button">
+                Refresh data
+              </button>
             </div>
-            <span id="symbol-help" class="field-help">
-              Type a ticker or company name to see matching symbols.
-            </span>
-          </label>
-          <label>
-            Start date
-            <input id="start-date-input" name="start_date" type="date" />
-          </label>
-          <label>
-            End date
-            <input id="end-date-input" name="end_date" type="date" />
-          </label>
-          <button type="submit">Load charts</button>
-        </form>
-        <div id="status-message" class="status-message" aria-live="polite"></div>
-        <div id="range-summary" class="range-summary"></div>
+          </form>
+          <div id="status-message" class="status-message" aria-live="polite"></div>
+          <div id="range-summary" class="range-summary"></div>
+        </section>
+
+        <section class="chart-grid">
+          <article class="chart-card fundamentals-card">
+            <div class="card-header">
+              <div class="card-title-row">
+                <h2>Company Snapshot</h2>
+                <div class="evaluation-help">
+                  <button
+                    class="evaluation-help-button"
+                    type="button"
+                    aria-label="Explain evaluation metrics"
+                    aria-describedby="evaluation-help-bubble"
+                  >
+                    ?
+                  </button>
+                  <div id="evaluation-help-bubble" class="evaluation-bubble" role="tooltip">
+                    <section>
+                      <h3>Market</h3>
+                      <ul>
+                        <li><strong>Last:</strong> latest traded price, or mark price when last trade is unavailable.</li>
+                        <li><strong>Change:</strong> latest price minus previous close.</li>
+                        <li><strong>Change %:</strong> change divided by previous close.</li>
+                        <li><strong>Volume:</strong> latest traded share count; falls back to 10-day average volume if needed.</li>
+                        <li><strong>52W high/low:</strong> highest and lowest prices over the last 52 weeks.</li>
+                      </ul>
+                    </section>
+                    <section>
+                      <h3>Valuation</h3>
+                      <ul>
+                        <li><strong>Market cap:</strong> share price multiplied by shares outstanding.</li>
+                        <li><strong>P/E:</strong> share price divided by trailing twelve-month EPS.</li>
+                        <li><strong>PEG:</strong> P/E divided by expected or historical earnings growth.</li>
+                        <li><strong>Price/book:</strong> share price divided by book value per share.</li>
+                        <li><strong>EPS TTM:</strong> trailing twelve-month earnings per share.</li>
+                        <li><strong>Beta:</strong> stock volatility relative to the market; above 1 is more volatile.</li>
+                      </ul>
+                    </section>
+                    <section>
+                      <h3>Quality</h3>
+                      <ul>
+                        <li><strong>Gross margin:</strong> gross profit divided by revenue.</li>
+                        <li><strong>Operating margin:</strong> operating income divided by revenue.</li>
+                        <li><strong>Net margin:</strong> net income divided by revenue.</li>
+                        <li><strong>ROE:</strong> net income divided by shareholder equity.</li>
+                        <li><strong>Current ratio:</strong> current assets divided by current liabilities.</li>
+                        <li><strong>Debt/equity:</strong> total debt divided by shareholder equity.</li>
+                      </ul>
+                    </section>
+                  </div>
+                </div>
+              </div>
+              <p id="fundamentals-description">
+                Latest quote, valuation, profitability, and balance-sheet metrics.
+              </p>
+            </div>
+            <div id="fundamentals-widget" class="fundamentals-widget empty-surface">
+              Enter a symbol to render company fundamentals.
+            </div>
+          </article>
+
+          <article class="chart-card price-chart-card">
+            <div class="card-header">
+              <h2 id="chart-title">Hourly Candlestick Chart</h2>
+              <p id="chart-description">
+                Hourly open, high, low, and close across the selected date range.
+              </p>
+            </div>
+            <div id="timeseries-chart" class="chart-surface empty-surface">
+              Enter a symbol to render the candlestick chart.
+            </div>
+          </article>
+        </section>
       </section>
 
-      <section class="chart-grid">
-        <article class="chart-card">
+      <section
+        id="portfolio-view"
+        class="app-view"
+        aria-labelledby="portfolio-tab-button"
+        hidden
+      >
+        <div class="portfolio-toolbar">
+          <div>
+            <h2>Portfolio Dashboard</h2>
+            <p id="portfolio-as-of">Latest account and position snapshot.</p>
+          </div>
+          <button id="portfolio-refresh-button" class="secondary-button" type="button">
+            Refresh data
+          </button>
+        </div>
+        <div id="portfolio-status-message" class="status-message" aria-live="polite"></div>
+
+        <section id="portfolio-kpi-grid" class="portfolio-kpi-grid" aria-label="Portfolio KPIs"></section>
+
+        <section class="portfolio-dashboard-grid">
+          <article class="chart-card allocation-panel">
+            <div class="card-header">
+              <h2>Allocation</h2>
+              <p>Stocks, ETF, Bonds, and Cash by latest market value.</p>
+            </div>
+            <div id="portfolio-allocation-chart" class="portfolio-chart-surface empty-surface">
+              Load portfolio data to render allocation.
+            </div>
+          </article>
+
+          <article class="chart-card risk-panel">
+            <div class="card-header">
+              <h2>Risk vs SPY</h2>
+              <p>Snapshot 1-year alpha, beta, and return comparison.</p>
+            </div>
+            <div id="portfolio-risk-panel" class="portfolio-metric-panel"></div>
+          </article>
+
+          <article class="chart-card balance-panel">
+            <div class="card-header">
+              <h2>Balance</h2>
+              <p>Latest aggregate account balance and liquidity.</p>
+            </div>
+            <div id="portfolio-balance-panel" class="portfolio-metric-panel"></div>
+          </article>
+        </section>
+
+        <section class="chart-card portfolio-history-panel">
           <div class="card-header">
-            <h2>Daily Candlestick Chart</h2>
-            <p>Open, high, low, and close across the selected date range.</p>
+            <h2>Portfolio History</h2>
+            <p>Portfolio value with realized gain/loss events from closing trades.</p>
           </div>
-          <div id="timeseries-chart" class="chart-surface empty-surface">
-            Enter a symbol to render the candlestick chart.
+          <div id="portfolio-history-chart" class="portfolio-history-chart empty-surface">
+            Load portfolio data to render history.
           </div>
-        </article>
+        </section>
+
+        <section class="chart-card holdings-panel">
+          <div class="card-header">
+            <h2>Holdings</h2>
+            <p>Latest positions sorted by market value.</p>
+          </div>
+          <div class="holdings-table-wrap">
+            <table class="holdings-table">
+              <thead>
+                <tr>
+                  <th><button type="button" data-holdings-sort="symbol">Symbol</button></th>
+                  <th><button type="button" data-holdings-sort="category">Category</button></th>
+                  <th><button type="button" data-holdings-sort="quantity">Quantity</button></th>
+                  <th><button type="button" data-holdings-sort="average_price">Avg Price</button></th>
+                  <th><button type="button" data-holdings-sort="market_value">Market Value</button></th>
+                  <th><button type="button" data-holdings-sort="weight">Weight</button></th>
+                  <th><button type="button" data-holdings-sort="day_profit_loss">Day P/L</button></th>
+                  <th><button type="button" data-holdings-sort="day_profit_loss_percentage">Day P/L %</button></th>
+                </tr>
+              </thead>
+              <tbody id="portfolio-holdings-body">
+                <tr>
+                  <td colspan="8">Load portfolio data to render holdings.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
       </section>
     </main>
+    <div id="chart-toast" class="chart-toast" aria-live="polite" aria-atomic="true"></div>
 
     <script src="/static/main.js"></script>
   </body>
