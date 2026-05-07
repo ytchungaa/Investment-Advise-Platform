@@ -3,8 +3,8 @@ set -euo pipefail
 
 PROJECT_ROOT="/home/ytchungaa/Documents/GitHub/Investment-Advise-Platform"
 LOCK_FILE="${PROJECT_ROOT}/logs/dwd_price_history_update.lock"
-MAX_WAIT_SECONDS=3600
-SLEEP_SECONDS=60
+DWD_REFRESH_LOOKBACK_DAYS="${DWD_REFRESH_LOOKBACK_DAYS:-10}"
+DWD_BUCKET_TIMEZONE="${DWD_BUCKET_TIMEZONE:-America/New_York}"
 
 cd "${PROJECT_ROOT}"
 mkdir -p logs
@@ -14,17 +14,6 @@ if ! flock -n 9; then
     echo "$(date -Is) another DWD price-history update is already running; exiting"
     exit 0
 fi
-
-waited_seconds=0
-while pgrep -f "daily_update.py" >/dev/null; do
-    if (( waited_seconds >= MAX_WAIT_SECONDS )); then
-        echo "$(date -Is) daily_update.py is still running after ${MAX_WAIT_SECONDS}s; skipping DWD update"
-        exit 1
-    fi
-    echo "$(date -Is) waiting for daily_update.py to finish before DWD update"
-    sleep "${SLEEP_SECONDS}"
-    waited_seconds=$((waited_seconds + SLEEP_SECONDS))
-done
 
 set -a
 source .env
@@ -39,6 +28,10 @@ psql \
     -U "${POSTGRES_DB_USERNAME:?POSTGRES_DB_USERNAME is not set}" \
     -d investment_advise_platform \
     -v ON_ERROR_STOP=1 \
+    -v refresh_start_time="${DWD_REFRESH_START_TIME:-}" \
+    -v refresh_end_time="${DWD_REFRESH_END_TIME:-}" \
+    -v refresh_lookback_days="${DWD_REFRESH_LOOKBACK_DAYS}" \
+    -v bucket_timezone="${DWD_BUCKET_TIMEZONE}" \
     -P pager=off \
     -f database/update_tables/dwd.price_history_hourly_incremental_upsert.sql
 
@@ -48,6 +41,10 @@ psql \
     -U "${POSTGRES_DB_USERNAME:?POSTGRES_DB_USERNAME is not set}" \
     -d investment_advise_platform \
     -v ON_ERROR_STOP=1 \
+    -v refresh_start_time="${DWD_REFRESH_START_TIME:-}" \
+    -v refresh_end_time="${DWD_REFRESH_END_TIME:-}" \
+    -v refresh_lookback_days="${DWD_REFRESH_LOOKBACK_DAYS}" \
+    -v bucket_timezone="${DWD_BUCKET_TIMEZONE}" \
     -P pager=off \
     -f database/update_tables/dwd.price_history_daily_incremental_upsert.sql
 

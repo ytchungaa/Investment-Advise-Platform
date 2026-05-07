@@ -21,6 +21,7 @@ PRICE_HISTORY_UPDATE_COLUMNS = [
     "need_extended_hours_data",
 ]
 DEFAULT_PRICE_HISTORY_WORKERS = 8
+PRICE_HISTORY_FLUSH_SYMBOLS = 25
 _THREAD_LOCAL = threading.local()
 
 
@@ -247,6 +248,27 @@ def _fetch_symbol_price_history(
     return price_df.drop(columns=["symbol"])
 
 
+def _upsert_price_history_frames(
+    db_ods: connector,
+    price_frames: list[pd.DataFrame],
+) -> int:
+    if not price_frames:
+        return 0
+
+    price_history_df = pd.concat(price_frames, ignore_index=True)
+    _log_stage("Upserting minute price history", rows=len(price_history_df))
+    success = db_ods.upsert_dataframe(
+        price_history_df,
+        table_name="price_history",
+        conflict_columns=["instrument_id", "frequency_type", "frequency", "candle_time"],
+        update_columns=PRICE_HISTORY_UPDATE_COLUMNS,
+        chunksize=500,
+    )
+    if not success:
+        raise RuntimeError("Failed to upsert price history during market data update.")
+    return len(price_history_df)
+
+
 def stock_list_market_data(
     start_date: str | None = None,
     end_date: str | None = None,
@@ -380,6 +402,8 @@ def stock_list_market_data(
         )
 
     price_frames: list[pd.DataFrame] = []
+    price_rows_upserted = 0
+    failed_symbols: list[str] = []
     symbols_already_current = 0
     symbols_with_existing_minute_history = 0
     price_history_jobs: list[dict] = []
@@ -455,9 +479,22 @@ def stock_list_market_data(
                 try:
                     price_df = future.result()
                 except Exception as exc:
-                    raise RuntimeError(
-                        f"Failed to fetch 1-minute price history for symbol '{symbol}'."
-                    ) from exc
+                    logger.exception(
+                        "Failed to fetch 1-minute price history for symbol '%s'. "
+                        "Successful symbols will remain persisted and this symbol will retry next run.",
+                        symbol,
+                    )
+                    failed_symbols.append(symbol)
+                    completed_jobs += 1
+                    _log_stage(
+                        "Minute history progress",
+                        completed=completed_jobs,
+                        total=len(price_history_jobs),
+                        symbol=symbol,
+                        rows=0,
+                        status="failed",
+                    )
+                    continue
 
                 if price_df.empty:
                     logger.warning(f"No 1-minute price history returned for symbol '{symbol}'.")
@@ -471,6 +508,9 @@ def stock_list_market_data(
                     )
                     continue
                 price_frames.append(price_df)
+                if len(price_frames) >= PRICE_HISTORY_FLUSH_SYMBOLS:
+                    price_rows_upserted += _upsert_price_history_frames(db_ods, price_frames)
+                    price_frames.clear()
                 completed_jobs += 1
                 _log_stage(
                     "Minute history progress",
@@ -480,33 +520,26 @@ def stock_list_market_data(
                     rows=len(price_df),
                 )
 
-    if price_frames:
-        price_history_df = pd.concat(price_frames, ignore_index=True)
-        _log_stage("Upserting minute price history", rows=len(price_history_df))
-        success = db_ods.upsert_dataframe(
-            price_history_df,
-            table_name="price_history",
-            conflict_columns=["instrument_id", "frequency_type", "frequency", "candle_time"],
-            update_columns=PRICE_HISTORY_UPDATE_COLUMNS,
-            chunksize=500,
-        )
-        if not success:
-            raise RuntimeError("Failed to upsert price history during daily update.")
-    else:
-        price_history_df = pd.DataFrame()
+    price_rows_upserted += _upsert_price_history_frames(db_ods, price_frames)
 
     summary = {
         "symbols": len(symbols),
         "instrument_rows": len(instruments_df),
         "quote_rows": len(quotes_df),
         "fundamental_rows": len(fundamentals_df),
-        "price_rows": len(price_history_df),
+        "price_rows": price_rows_upserted,
         "price_window_end": str(requested_end_timestamp),
         "symbols_with_existing_minute_history": symbols_with_existing_minute_history,
         "symbols_already_current": symbols_already_current,
+        "failed_symbols": len(failed_symbols),
         "price_history_workers": min(max_price_history_workers, max(len(price_history_jobs), 1)),
     }
     logger.info(f"Market data update completed: {summary}")
+    if failed_symbols:
+        raise RuntimeError(
+            "Failed to fetch minute price history for "
+            f"{len(failed_symbols)} symbol(s): {', '.join(failed_symbols)}"
+        )
     return summary
 
 

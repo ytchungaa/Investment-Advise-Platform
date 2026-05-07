@@ -1,10 +1,29 @@
+\if :{?refresh_start_time}
+\else
+\set refresh_start_time ''
+\endif
+\if :{?refresh_end_time}
+\else
+\set refresh_end_time ''
+\endif
+\if :{?refresh_lookback_days}
+\else
+\set refresh_lookback_days '10'
+\endif
+\if :{?bucket_timezone}
+\else
+\set bucket_timezone 'America/New_York'
+\endif
+
 BEGIN;
 
 WITH refresh_params AS (
     SELECT
-        NULL::TIMESTAMPTZ AS start_time,
-        NULL::TIMESTAMPTZ AS end_time,
-        'America/New_York'::TEXT AS bucket_timezone
+        NULLIF(:'refresh_start_time', '')::TIMESTAMPTZ AS requested_start_time,
+        NULLIF(:'refresh_end_time', '')::TIMESTAMPTZ AS requested_end_time,
+        GREATEST(COALESCE(NULLIF(:'refresh_lookback_days', '')::INTEGER, 10), 1)
+            AS refresh_lookback_days,
+        COALESCE(NULLIF(:'bucket_timezone', ''), 'America/New_York')::TEXT AS bucket_timezone
 ),
 source_bounds AS (
     SELECT
@@ -26,14 +45,22 @@ refresh_bounds AS (
 refresh_window AS (
     SELECT
         COALESCE(
-            rp.start_time,
-            COALESCE(
-                LEAST(rb.dwd_min_time, rb.source_min_time),
-                rb.dwd_min_time,
-                rb.source_min_time
-            )
+            rp.requested_start_time,
+            CASE
+                WHEN rb.dwd_min_time IS NULL THEN rb.source_min_time
+                ELSE GREATEST(
+                    rb.source_min_time,
+                    COALESCE(
+                        rp.requested_end_time,
+                        rb.source_max_time + INTERVAL '1 microsecond'
+                    ) - (rp.refresh_lookback_days * INTERVAL '1 day')
+                )
+            END
         ) AS start_time,
-        COALESCE(rp.end_time, rb.source_max_time + INTERVAL '1 microsecond') AS end_time,
+        COALESCE(
+            rp.requested_end_time,
+            rb.source_max_time + INTERVAL '1 microsecond'
+        ) AS end_time,
         rp.bucket_timezone
     FROM refresh_params rp
     CROSS JOIN refresh_bounds rb

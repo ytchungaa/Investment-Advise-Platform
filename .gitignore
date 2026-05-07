@@ -10,6 +10,7 @@ venv/
 
 # Logs
 *.log
+logs/*.lock
 
 # Tokens
 *.enc
