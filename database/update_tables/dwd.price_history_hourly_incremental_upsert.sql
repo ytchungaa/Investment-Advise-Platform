@@ -8,7 +8,7 @@
 \endif
 \if :{?refresh_lookback_days}
 \else
-\set refresh_lookback_days '10'
+\set refresh_lookback_days '1'
 \endif
 \if :{?bucket_timezone}
 \else
@@ -21,19 +21,28 @@ WITH refresh_params AS (
     SELECT
         NULLIF(:'refresh_start_time', '')::TIMESTAMPTZ AS requested_start_time,
         NULLIF(:'refresh_end_time', '')::TIMESTAMPTZ AS requested_end_time,
-        GREATEST(COALESCE(NULLIF(:'refresh_lookback_days', '')::INTEGER, 10), 1)
+        GREATEST(COALESCE(NULLIF(:'refresh_lookback_days', '')::INTEGER, 1), 1)
             AS refresh_lookback_days,
         COALESCE(NULLIF(:'bucket_timezone', ''), 'America/New_York')::TEXT AS bucket_timezone
 ),
 source_bounds AS (
     SELECT
-        MIN(ph.candle_time) AS source_min_time,
-        MAX(ph.candle_time) AS source_max_time
-    FROM ods.price_history ph
-    JOIN ods.price_history_frequency_type pft
-        ON pft.id = ph.frequency_type
-    WHERE pft.code = 'minute'
-      AND ph.frequency IN (1, 5, 10, 15, 30)
+        (
+            SELECT ph.candle_time
+            FROM ods.price_history ph
+            WHERE ph.frequency_type = 1
+              AND ph.frequency IN (1, 5, 10, 15, 30)
+            ORDER BY ph.candle_time ASC
+            LIMIT 1
+        ) AS source_min_time,
+        (
+            SELECT ph.candle_time
+            FROM ods.price_history ph
+            WHERE ph.frequency_type = 1
+              AND ph.frequency IN (1, 5, 10, 15, 30)
+            ORDER BY ph.candle_time DESC
+            LIMIT 1
+        ) AS source_max_time
 ),
 refresh_bounds AS (
     SELECT
@@ -97,10 +106,8 @@ source_rows AS (
         ph.previous_close,
         ph.previous_close_time
     FROM ods.price_history ph
-    JOIN ods.price_history_frequency_type pft
-        ON pft.id = ph.frequency_type
     CROSS JOIN refresh_window rw
-    WHERE pft.code = 'minute'
+    WHERE ph.frequency_type = 1
       AND ph.frequency IN (1, 5, 10, 15, 30)
       AND ph.candle_time >= date_trunc('hour', rw.start_time AT TIME ZONE rw.bucket_timezone)
           AT TIME ZONE rw.bucket_timezone

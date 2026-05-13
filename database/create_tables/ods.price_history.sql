@@ -16,3 +16,6 @@ CREATE TABLE IF NOT EXISTS ods.price_history (
 
 CREATE INDEX IF NOT EXISTS idx_price_history_instrument_time
 ON ods.price_history (instrument_id, candle_time DESC);
+
+CREATE INDEX IF NOT EXISTS idx_price_history_frequency_time
+ON ods.price_history (frequency_type, frequency, candle_time DESC, instrument_id);

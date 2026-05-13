@@ -508,6 +508,29 @@ def _portfolio_weight_value(value: Any) -> float:
     return numeric_value
 
 
+def _holding_total_cost(row: Any) -> float | None:
+    net_quantity = _to_float(getattr(row, "net_quantity", None))
+    average_price = first_available_number(
+        getattr(row, "average_price", None),
+        getattr(row, "average_long_price", None),
+        getattr(row, "taxlot_average_long_price", None),
+    )
+    if net_quantity is not None and average_price is not None:
+        total_cost = abs(net_quantity) * average_price
+        if total_cost > 0:
+            return total_cost
+
+    current_day_cost = _to_float(getattr(row, "current_day_cost", None))
+    if current_day_cost is not None and current_day_cost > 0:
+        return current_day_cost
+    return None
+
+
+def _portfolio_cost_value(row: Any) -> float:
+    total_cost = _holding_total_cost(row)
+    return total_cost if total_cost is not None and total_cost > 0 else 0.0
+
+
 def _load_portfolio_holdings(db: connector) -> pd.DataFrame:
     holdings_df = db.query_dataframe(
         """
@@ -525,7 +548,9 @@ def _load_portfolio_holdings(db: connector) -> pd.DataFrame:
             net_quantity,
             average_price,
             average_long_price,
+            taxlot_average_long_price,
             market_value,
+            current_day_cost,
             current_day_profit_loss,
             current_day_profit_loss_percentage
         FROM dwd.fact_position_latest
@@ -747,7 +772,7 @@ def first_available_number(*values: Any) -> float | None:
 def _build_holdings_payload(
     holdings_df: pd.DataFrame,
     price_history_df: pd.DataFrame,
-    total_weight_value: float,
+    total_cost_value: float,
 ) -> list[dict[str, Any]]:
     holdings: list[dict[str, Any]] = []
     if holdings_df.empty:
@@ -755,6 +780,7 @@ def _build_holdings_payload(
 
     for row in holdings_df.itertuples(index=False):
         market_value = _to_float(getattr(row, "market_value", None))
+        total_cost = _holding_total_cost(row)
         symbol = str(getattr(row, "symbol", "") or "").upper()
         category = _portfolio_category(getattr(row, "asset_type", None))
         holdings.append(
@@ -765,9 +791,10 @@ def _build_holdings_payload(
                 "asset_type": _to_json_value(getattr(row, "asset_type", None)),
                 "quantity": _to_json_value(getattr(row, "net_quantity", None)),
                 "average_price": _to_json_value(getattr(row, "average_price", None)),
+                "total_cost": _to_json_value(total_cost),
                 "market_value": _to_json_value(market_value),
-                "weight": (market_value / total_weight_value)
-                if market_value is not None and total_weight_value > 0
+                "weight": (total_cost / total_cost_value)
+                if total_cost is not None and total_cost_value > 0
                 else None,
                 "day_profit_loss": _to_json_value(
                     getattr(row, "current_day_profit_loss", None)
@@ -912,7 +939,12 @@ def get_portfolio_data() -> dict[str, Any]:
         realized_events_df = _load_realized_gain_loss_events(db)
 
         allocation, total_weight_value = _build_allocation(holdings_df, balance)
-        holdings = _build_holdings_payload(holdings_df, price_history_df, total_weight_value)
+        total_cost_value = (
+            sum(_portfolio_cost_value(row) for row in holdings_df.itertuples(index=False))
+            if not holdings_df.empty
+            else 0.0
+        )
+        holdings = _build_holdings_payload(holdings_df, price_history_df, total_cost_value)
         risk_metrics, warnings = _build_portfolio_risk_metrics(holdings, price_history_df)
         history = _build_portfolio_history_payload(balance_history_df, realized_events_df)
 

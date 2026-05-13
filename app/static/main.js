@@ -689,7 +689,7 @@ function renderPortfolioHoldings(payload) {
   if (!holdings.length) {
     const row = document.createElement("tr");
     const cell = document.createElement("td");
-    cell.colSpan = 8;
+    cell.colSpan = 9;
     cell.textContent = "No portfolio holdings are available. Load account data into ODS/DWD first.";
     row.appendChild(cell);
     portfolioHoldingsBody.appendChild(row);
@@ -703,6 +703,7 @@ function renderPortfolioHoldings(payload) {
       holding.category,
       formatPlainNumber(holding.quantity),
       formatMetricValue(holding.average_price, "currency"),
+      formatMetricValue(holding.total_cost, "currency"),
       formatMetricValue(holding.market_value, "currency"),
       formatRatio(holding.weight, { signDisplay: "auto" }),
       formatMetricValue(holding.day_profit_loss, "currency"),
@@ -717,9 +718,9 @@ function renderPortfolioHoldings(payload) {
     cells.forEach((value, index) => {
       const cell = document.createElement("td");
       cell.textContent = value;
-      if (index === 6 || index === 7) {
+      if (index === 7 || index === 8) {
         const tone = valueTone(
-          index === 6 ? holding.day_profit_loss : holding.day_profit_loss_percentage
+          index === 7 ? holding.day_profit_loss : holding.day_profit_loss_percentage
         );
         if (tone) {
           cell.classList.add(tone);

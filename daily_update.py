@@ -138,11 +138,19 @@ def _normalize_timestamp_utc(value) -> pd.Timestamp | None:
 def _latest_minute_history_by_instrument(db_ods: connector) -> pd.DataFrame:
     latest_history_df = db_ods.query_dataframe(
         """
-        SELECT instrument_id, MAX(candle_time) AS latest_candle_time
-        FROM price_history
-        WHERE frequency_type = :frequency_type
-          AND frequency = :frequency
-        GROUP BY instrument_id;
+        SELECT
+            i.id AS instrument_id,
+            latest_history.latest_candle_time
+        FROM instrument i
+        JOIN LATERAL (
+            SELECT ph.candle_time AS latest_candle_time
+            FROM price_history ph
+            WHERE ph.instrument_id = i.id
+              AND ph.frequency_type = :frequency_type
+              AND ph.frequency = :frequency
+            ORDER BY ph.candle_time DESC
+            LIMIT 1
+        ) latest_history ON TRUE;
         """,
         params={
             "frequency_type": MINUTE_FREQUENCY_TYPE_ID,
